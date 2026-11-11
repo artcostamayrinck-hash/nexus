@@ -1,0 +1,181 @@
+<UserControl x:Class="Nexus.Desktop.Views.RealtimeView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <StackPanel>
+      <DockPanel Margin="0,0,0,18">
+        <StackPanel DockPanel.Dock="Left">
+          <TextBlock Text="Comunicação em Tempo Real (SignalR)" Style="{StaticResource PageTitleStyle}" />
+          <TextBlock Text="Sessões autenticadas, presença real dos dispositivos, comandos com cancelamento e confirmação ACK."
+                     Style="{StaticResource PageSubtitleStyle}"
+                     Margin="0,4,0,0" />
+        </StackPanel>
+        <WrapPanel DockPanel.Dock="Right" VerticalAlignment="Center">
+          <Button Content="Conectar SignalR"
+                  Command="{Binding ConnectCommand}"
+                  Style="{StaticResource NexusPrimaryButtonStyle}"
+                  Margin="0,0,8,0" />
+          <Button Content="Desconectar"
+                  Command="{Binding DisconnectCommand}"
+                  Style="{StaticResource NexusDangerButtonStyle}" />
+        </WrapPanel>
+      </DockPanel>
+
+      <!-- Real-Time Connection State KPIs -->
+      <UniformGrid Columns="4" Margin="0,0,0,14">
+        <Border Style="{StaticResource NexusCardStyle}" Margin="0,0,12,12">
+          <StackPanel>
+            <TextBlock Text="ESTADO SIGNALR" Style="{StaticResource LabelMutedStyle}" />
+            <TextBlock Text="{Binding ConnectionStateText}" Foreground="{StaticResource CyanAccentBrush}" FontSize="19" FontWeight="Bold" Margin="0,6,0,2" />
+            <TextBlock Text="{Binding EndpointText}" Foreground="{StaticResource TextSecondaryBrush}" FontFamily="Consolas" FontSize="11" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </Border>
+        <Border Style="{StaticResource NexusCardStyle}" Margin="0,0,12,12">
+          <StackPanel>
+            <TextBlock Text="DISPOSITIVOS CONECTADOS" Style="{StaticResource LabelMutedStyle}" />
+            <TextBlock Text="{Binding OnlinePeersCount}" Foreground="{StaticResource SuccessBrush}" FontSize="20" FontWeight="Bold" Margin="0,6,0,2" />
+            <TextBlock Text="{Binding OfflinePeersCount, StringFormat='{}{0} offline no catálogo'}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" />
+          </StackPanel>
+        </Border>
+        <Border Style="{StaticResource NexusCardStyle}" Margin="0,0,12,12">
+          <StackPanel>
+            <TextBlock Text="HEARTBEAT SIGNALR" Style="{StaticResource LabelMutedStyle}" />
+            <TextBlock Text="{Binding LastHeartbeatText}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="15" FontWeight="Bold" Margin="0,6,0,2" />
+            <TextBlock Text="Ping bidirecional ativo" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" />
+          </StackPanel>
+        </Border>
+        <Border Style="{StaticResource NexusCardStyle}" Margin="0,0,0,12">
+          <StackPanel>
+            <TextBlock Text="SESSÃO ATIVA" Style="{StaticResource LabelMutedStyle}" />
+            <TextBlock Text="{Binding SessionIdText}" Foreground="{StaticResource TextPrimaryBrush}" FontFamily="Consolas" FontSize="11" Margin="0,6,0,2" TextTrimming="CharacterEllipsis" />
+            <TextBlock Text="{Binding BulkTransferStatus}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </Border>
+      </UniformGrid>
+
+      <Border Style="{StaticResource NexusElevatedCardStyle}" Margin="0,0,0,14">
+        <DockPanel>
+          <TextBlock Text="{Binding StatusBanner}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center" />
+          <WrapPanel DockPanel.Dock="Right" HorizontalAlignment="Right">
+            <Button Content="Atualizar Presença" Command="{Binding RefreshPresenceCommand}" Style="{StaticResource NexusSecondaryButtonStyle}" Margin="8,0,0,0" />
+            <Button Content="Heartbeat Ping" Command="{Binding SendHeartbeatCommand}" Style="{StaticResource NexusSecondaryButtonStyle}" Margin="8,0,0,0" />
+            <Button Content="Teste HTTP Bulk" Command="{Binding SendBulkHttpTestCommand}" Style="{StaticResource NexusSecondaryButtonStyle}" Margin="8,0,0,0" />
+          </WrapPanel>
+        </DockPanel>
+      </Border>
+
+      <Grid Margin="0,0,0,14">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="1*" />
+          <ColumnDefinition Width="16" />
+          <ColumnDefinition Width="1.15*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Real-Time Presence List -->
+        <Border Grid.Column="0" Style="{StaticResource NexusCardStyle}">
+          <StackPanel>
+            <TextBlock Text="Presença Real de Dispositivos" Style="{StaticResource CardHeaderStyle}" Margin="0,0,0,10" />
+            <ListBox ItemsSource="{Binding PresenceItems}"
+                     SelectedItem="{Binding SelectedPeer}"
+                     Background="Transparent"
+                     BorderThickness="0"
+                     MinHeight="200">
+              <ListBox.ItemTemplate>
+                <DataTemplate>
+                  <Border Background="{StaticResource NavyElevatedBrush}"
+                          BorderBrush="{StaticResource NavyBorderBrush}"
+                          BorderThickness="1"
+                          CornerRadius="8"
+                          Padding="10"
+                          Margin="0,0,0,8">
+                    <DockPanel>
+                      <StackPanel DockPanel.Dock="Left">
+                        <TextBlock Text="{Binding DeviceName}" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="13" />
+                        <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="11">
+                          <Run Text="{Binding Platform}" />
+                          <Run Text=" · " />
+                          <Run Text="{Binding ConnectionState}" />
+                        </TextBlock>
+                      </StackPanel>
+                      <TextBlock DockPanel.Dock="Right"
+                                 VerticalAlignment="Center"
+                                 Text="{Binding RouteSummary}"
+                                 Foreground="{StaticResource CyanAccentBrush}"
+                                 FontSize="11"
+                                 FontWeight="SemiBold" />
+                    </DockPanel>
+                  </Border>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </StackPanel>
+        </Border>
+
+        <!-- Command & Event Dispatch -->
+        <Border Grid.Column="2" Style="{StaticResource NexusCardStyle}">
+          <StackPanel>
+            <TextBlock Text="Comandos &amp; Eventos em Tempo Real" Style="{StaticResource CardHeaderStyle}" Margin="0,0,0,10" />
+            <TextBlock Text="Comando (para o dispositivo selecionado)" Style="{StaticResource LabelMutedStyle}" Margin="0,0,0,4" />
+            <TextBox Text="{Binding CommandNameInput, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource NexusTextBoxStyle}" Margin="0,0,0,8" />
+            <TextBlock Text="Argumentos JSON" Style="{StaticResource LabelMutedStyle}" Margin="0,0,0,4" />
+            <TextBox Text="{Binding CommandArgsInput, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource NexusTextBoxStyle}" Margin="0,0,0,10" />
+            <WrapPanel Margin="0,0,0,14">
+              <Button Content="Enviar Comando" Command="{Binding SendCommandCommand}" Style="{StaticResource NexusPrimaryButtonStyle}" Margin="0,0,8,0" />
+              <Button Content="Cancelar Último Comando" Command="{Binding CancelLastCommandCommand}" Style="{StaticResource NexusDangerButtonStyle}" />
+            </WrapPanel>
+
+            <TextBlock Text="Tipo do Evento" Style="{StaticResource LabelMutedStyle}" Margin="0,0,0,4" />
+            <TextBox Text="{Binding EventTypeInput, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource NexusTextBoxStyle}" Margin="0,0,0,8" />
+            <TextBlock Text="Payload JSON do Evento" Style="{StaticResource LabelMutedStyle}" Margin="0,0,0,4" />
+            <TextBox Text="{Binding EventPayloadInput, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource NexusTextBoxStyle}" Margin="0,0,0,10" />
+            <Button Content="Emitir Evento em Tempo Real" Command="{Binding SendIntegrationEventCommand}" Style="{StaticResource NexusSecondaryButtonStyle}" HorizontalAlignment="Left" />
+          </StackPanel>
+        </Border>
+      </Grid>
+
+      <!-- Incoming Messages & ACKs -->
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="1*" />
+          <ColumnDefinition Width="16" />
+          <ColumnDefinition Width="1*" />
+        </Grid.ColumnDefinitions>
+        <Border Grid.Column="0" Style="{StaticResource NexusCardStyle}">
+          <StackPanel>
+            <TextBlock Text="Mensagens Recebidas (Ordenadas)" Style="{StaticResource CardHeaderStyle}" Margin="0,0,0,8" />
+            <ItemsControl ItemsSource="{Binding RecentMessages}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Border Background="{StaticResource NavyDeepestBrush}" CornerRadius="6" Padding="8" Margin="0,0,0,6">
+                    <StackPanel>
+                      <TextBlock Text="{Binding MessageType}" Foreground="{StaticResource CyanAccentBrush}" FontSize="12" FontWeight="SemiBold" />
+                      <TextBlock Text="{Binding PayloadJson}" Foreground="{StaticResource TextSecondaryBrush}" FontFamily="Consolas" FontSize="11" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+        <Border Grid.Column="2" Style="{StaticResource NexusCardStyle}">
+          <StackPanel>
+            <TextBlock Text="Confirmações (ACK)" Style="{StaticResource CardHeaderStyle}" Margin="0,0,0,8" />
+            <ItemsControl ItemsSource="{Binding RecentAcks}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Border Background="{StaticResource NavyDeepestBrush}" CornerRadius="6" Padding="8" Margin="0,0,0,6">
+                    <StackPanel>
+                      <TextBlock Text="{Binding Status}" Foreground="{StaticResource SuccessBrush}" FontSize="12" FontWeight="SemiBold" />
+                      <TextBlock Text="{Binding Detail}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+      </Grid>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>
+

@@ -1,0 +1,219 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- NEXUS Dark Navy & Cyan Design Tokens -->
+  <Color x:Key="NavyDeepestColor">#070D1A</Color>
+  <Color x:Key="NavyBaseColor">#0B1426</Color>
+  <Color x:Key="NavySurfaceColor">#111E36</Color>
+  <Color x:Key="NavyElevatedColor">#162744</Color>
+  <Color x:Key="NavyBorderColor">#1F375E</Color>
+  <Color x:Key="CyanAccentColor">#00E5FF</Color>
+  <Color x:Key="CyanSoftColor">#0891B2</Color>
+  <Color x:Key="BlueAccentColor">#3B82F6</Color>
+  <Color x:Key="BluePressedColor">#2563EB</Color>
+  <Color x:Key="TextPrimaryColor">#F1F5F9</Color>
+  <Color x:Key="TextSecondaryColor">#94A3B8</Color>
+  <Color x:Key="TextMutedColor">#64748B</Color>
+  <Color x:Key="SuccessColor">#10B981</Color>
+  <Color x:Key="WarningColor">#F59E0B</Color>
+  <Color x:Key="DangerColor">#EF4444</Color>
+
+  <SolidColorBrush x:Key="NavyDeepestBrush" Color="{StaticResource NavyDeepestColor}" />
+  <SolidColorBrush x:Key="NavyBaseBrush" Color="{StaticResource NavyBaseColor}" />
+  <SolidColorBrush x:Key="NavySurfaceBrush" Color="{StaticResource NavySurfaceColor}" />
+  <SolidColorBrush x:Key="NavyElevatedBrush" Color="{StaticResource NavyElevatedColor}" />
+  <SolidColorBrush x:Key="NavyBorderBrush" Color="{StaticResource NavyBorderColor}" />
+  <SolidColorBrush x:Key="CyanAccentBrush" Color="{StaticResource CyanAccentColor}" />
+  <SolidColorBrush x:Key="CyanSoftBrush" Color="{StaticResource CyanSoftColor}" />
+  <SolidColorBrush x:Key="BlueAccentBrush" Color="{StaticResource BlueAccentColor}" />
+  <SolidColorBrush x:Key="BluePressedBrush" Color="{StaticResource BluePressedColor}" />
+  <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimaryColor}" />
+  <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondaryColor}" />
+  <SolidColorBrush x:Key="TextMutedBrush" Color="{StaticResource TextMutedColor}" />
+  <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource SuccessColor}" />
+  <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource WarningColor}" />
+  <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource DangerColor}" />
+
+  <!-- Subtle Card Style -->
+  <Style x:Key="NexusCardStyle" TargetType="Border">
+    <Setter Property="Background" Value="{StaticResource NavySurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource NavyBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="Padding" Value="20" />
+  </Style>
+
+  <Style x:Key="NexusElevatedCardStyle" TargetType="Border">
+    <Setter Property="Background" Value="{StaticResource NavyElevatedBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource NavyBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="Padding" Value="16" />
+  </Style>
+
+  <!-- Primary Accent Button -->
+  <Style x:Key="NexusPrimaryButtonStyle" TargetType="Button">
+    <Setter Property="Background" Value="{StaticResource BlueAccentBrush}" />
+    <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Padding" Value="16,10" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="Bd"
+                  Background="{TemplateBinding Background}"
+                  CornerRadius="10"
+                  Padding="{TemplateBinding Padding}">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Bd" Property="Background" Value="{StaticResource CyanSoftBrush}" />
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+              <Setter TargetName="Bd" Property="Background" Value="{StaticResource BluePressedBrush}" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="Bd" Property="Opacity" Value="0.45" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- Secondary Outline Button -->
+  <Style x:Key="NexusSecondaryButtonStyle" TargetType="Button">
+    <Setter Property="Background" Value="{StaticResource NavyElevatedBrush}" />
+    <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource NavyBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Padding" Value="14,9" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="Bd"
+                  Background="{TemplateBinding Background}"
+                  BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}"
+                  CornerRadius="10"
+                  Padding="{TemplateBinding Padding}">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource CyanAccentBrush}" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="Bd" Property="Opacity" Value="0.45" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- Rounded TextBox -->
+  <Style x:Key="NexusTextBoxStyle" TargetType="TextBox">
+    <Setter Property="Background" Value="{StaticResource NavyDeepestBrush}" />
+    <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+    <Setter Property="CaretBrush" Value="{StaticResource CyanAccentBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource NavyBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Padding" Value="12,9" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="TextBox">
+          <Border x:Name="Bd"
+                  Background="{TemplateBinding Background}"
+                  BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}"
+                  CornerRadius="10">
+            <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+              <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource CyanAccentBrush}" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- Typography -->
+  <Style x:Key="PageTitleStyle" TargetType="TextBlock">
+    <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+    <Setter Property="FontSize" Value="24" />
+    <Setter Property="FontWeight" Value="Bold" />
+  </Style>
+
+  <Style x:Key="PageSubtitleStyle" TargetType="TextBlock">
+    <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+
+  <Style x:Key="CardHeaderStyle" TargetType="TextBlock">
+    <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+    <Setter Property="FontSize" Value="15" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+
+  <Style x:Key="LabelMutedStyle" TargetType="TextBlock">
+    <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+    <Setter Property="FontSize" Value="12" />
+  </Style>
+
+  <!-- Danger Button -->
+  <Style x:Key="NexusDangerButtonStyle" TargetType="Button">
+    <Setter Property="Background" Value="#3B1219" />
+    <Setter Property="Foreground" Value="#FCA5A5" />
+    <Setter Property="BorderBrush" Value="{StaticResource DangerBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Padding" Value="14,9" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="Bd"
+                  Background="{TemplateBinding Background}"
+                  BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}"
+                  CornerRadius="10"
+                  Padding="{TemplateBinding Padding}">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Bd" Property="Background" Value="{StaticResource DangerBrush}" />
+              <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="Bd" Property="Opacity" Value="0.45" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- Vector Icon Geometries -->
+  <Geometry x:Key="IconHome">M10,20V14H14V20H19V12H22L12,3L2,12H5V20H10Z</Geometry>
+  <Geometry x:Key="IconQrCode">M3,11H11V3H3V11ZM5,5H9V9H5V5ZM3,21H11V13H3V21ZM5,15H9V19H5V15ZM13,3V11H21V3H13ZM19,9H15V5H19V9ZM13,13H15V15H13V13ZM15,15H17V17H15V15ZM17,17H19V19H17V17ZM19,19H21V21H19V19ZM19,13H21V15H19V13ZM15,19H17V21H15V19ZM13,17H15V19H13V17ZM17,13H19V15H17V13Z</Geometry>
+  <Geometry x:Key="IconDevices">M4,6H22V4H4C2.9,4 2,4.9 2,6V17H0V20H14V17H4V6ZM23,8H17C16.45,8 16,8.45 16,9V19C16,19.55 16.45,20 17,20H23C23.55,20 24,19.55 24,19V9C24,8.45 23.55,8 23,8ZM22,17H18V10H22V17Z</Geometry>
+  <Geometry x:Key="IconPulse">M3,13H7.4L9.4,7.6L13.1,17.2L15.8,11H21V13H17.2L13.1,21L9.4,11.6L8.4,14.5H3V13Z</Geometry>
+  <Geometry x:Key="IconNetwork">M12,2C6.48,2 2,6.48 2,12C2,17.52 6.48,22 12,22C17.52,22 22,17.52 22,12C22,6.48 17.52,2 12,2ZM11,19.93C7.05,19.44 4,16.08 4,12C4,11.38 4.08,10.79 4.21,10.21L9,15V16C9,17.1 9.9,18 11,18V19.93ZM17.9,17.39C17.64,16.58 16.9,16 16,16H15V13C15,12.45 14.55,12 14,12H8V10H10C10.55,10 11,9.55 11,9V7H13C14.1,7 15,6.1 15,5V4.59C17.93,5.77 20,8.64 20,12C20,14.08 19.2,15.97 17.9,17.39Z</Geometry>
+  <Geometry x:Key="IconSync">M12,4V1L8,5L12,9V6A6,6 0 0,1 18,12C18,13 17.75,13.97 17.3,14.8L18.76,16.26C19.54,15.03 20,13.57 20,12A8,8 0 0,0 12,4M12,18A6,6 0 0,1 6,12C6,11 6.25,10.03 6.7,9.2L5.24,7.74C4.46,8.97 4,10.43 4,12A8,8 0 0,0 12,20V23L16,19L12,15V18Z</Geometry>
+  <Geometry x:Key="IconSettings">M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.67 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z</Geometry>
+
+</ResourceDictionary>
+

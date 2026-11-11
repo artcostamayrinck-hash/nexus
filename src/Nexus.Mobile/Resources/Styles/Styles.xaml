@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+  <Style TargetType="ContentPage" ApplyToDerivedTypes="True">
+    <Setter Property="BackgroundColor" Value="{StaticResource NavyBase}" />
+  </Style>
+
+  <Style x:Key="NexusCard" TargetType="Border">
+    <Setter Property="BackgroundColor" Value="{StaticResource NavySurface}" />
+    <Setter Property="Stroke" Value="{StaticResource NavyBorder}" />
+    <Setter Property="StrokeThickness" Value="1" />
+    <Setter Property="StrokeShape" Value="RoundRectangle 16" />
+    <Setter Property="Padding" Value="18" />
+  </Style>
+
+  <Style x:Key="PrimaryButton" TargetType="Button">
+    <Setter Property="BackgroundColor" Value="{StaticResource BlueAccent}" />
+    <Setter Property="TextColor" Value="{StaticResource TextPrimary}" />
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="FontAttributes" Value="Bold" />
+    <Setter Property="HeightRequest" Value="48" />
+  </Style>
+
+  <Style x:Key="SecondaryButton" TargetType="Button">
+    <Setter Property="BackgroundColor" Value="{StaticResource NavyElevated}" />
+    <Setter Property="TextColor" Value="{StaticResource CyanAccent}" />
+    <Setter Property="BorderColor" Value="{StaticResource NavyBorder}" />
+    <Setter Property="BorderWidth" Value="1" />
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="HeightRequest" Value="46" />
+  </Style>
+
+  <Style x:Key="NexusEntry" TargetType="Entry">
+    <Setter Property="BackgroundColor" Value="{StaticResource NavyDeepest}" />
+    <Setter Property="TextColor" Value="{StaticResource TextPrimary}" />
+    <Setter Property="PlaceholderColor" Value="{StaticResource TextMuted}" />
+  </Style>
+</ResourceDictionary>
+

@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <RootNamespace>Nexus.UnitTests</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Nexus.Contracts\Nexus.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\Nexus.Core\Nexus.Core.csproj" />
+    <ProjectReference Include="..\..\src\Nexus.Desktop.Services\Nexus.Desktop.Services.csproj" />
+    <ProjectReference Include="..\..\src\Nexus.Infrastructure\Nexus.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Nexus.Mobile.Services\Nexus.Mobile.Services.csproj" />
+    <ProjectReference Include="..\..\src\Nexus.Modules\Nexus.Modules.csproj" />
+    <ProjectReference Include="..\..\src\Nexus.Security\Nexus.Security.csproj" />
+  </ItemGroup>
+</Project>
+

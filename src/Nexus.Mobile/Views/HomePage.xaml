@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Nexus.Mobile.Views.HomePage"
+             Title="NEXUS">
+  <ScrollView>
+    <VerticalStackLayout Padding="20" Spacing="16">
+      <Label Text="NEXUS" FontSize="28" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+      <Label Text="Nó Móvel Android · Fundação Pessoal" FontSize="13" TextColor="{StaticResource CyanAccent}" />
+
+      <Border Style="{StaticResource NexusCard}">
+        <VerticalStackLayout Spacing="6">
+          <Label Text="IDENTIDADE CRIPTOGRÁFICA LOCAL" FontSize="11" FontAttributes="Bold" TextColor="{StaticResource CyanAccent}" />
+          <Label Text="{Binding DeviceTitle}" FontSize="20" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+          <Label Text="{Binding DeviceSubtitle}" FontSize="13" TextColor="{StaticResource TextSecondary}" />
+          <Label Text="{Binding LocalFingerprintDisplay, StringFormat='ECDSA: {0}'}" FontSize="11" TextColor="{StaticResource CyanAccent}" />
+          <Label Text="{Binding PairedSummaryText}" FontSize="12" TextColor="{StaticResource SuccessGreen}" />
+        </VerticalStackLayout>
+      </Border>
+
+      <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+        <Border Style="{StaticResource NexusCard}">
+          <VerticalStackLayout Spacing="4">
+            <Label Text="CONEXÃO" FontSize="11" TextColor="{StaticResource TextMuted}" />
+            <Label Text="{Binding ConnectionBadge}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource CyanAccent}" />
+          </VerticalStackLayout>
+        </Border>
+        <Border Grid.Column="1" Style="{StaticResource NexusCard}">
+          <VerticalStackLayout Spacing="4">
+            <Label Text="ARMAZENAMENTO" FontSize="11" TextColor="{StaticResource TextMuted}" />
+            <Label Text="{Binding StorageBadge}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource SuccessGreen}" />
+          </VerticalStackLayout>
+        </Border>
+      </Grid>
+
+      <Border Style="{StaticResource NexusCard}">
+        <VerticalStackLayout Spacing="6">
+          <Label Text="DISPOSITIVOS CONHECIDOS" FontSize="11" TextColor="{StaticResource TextMuted}" />
+          <Label Text="{Binding KnownDevicesCount}" FontSize="26" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+        </VerticalStackLayout>
+      </Border>
+
+      <Button Text="Atualizar Núcleo"
+              SemanticProperties.Description="Atualizar estado do núcleo NEXUS"
+              Command="{Binding InitializeCommand}"
+              Style="{StaticResource PrimaryButton}" />
+    </VerticalStackLayout>
+  </ScrollView>
+</ContentPage>
+

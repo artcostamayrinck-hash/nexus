@@ -1,0 +1,173 @@
+<UserControl x:Class="Nexus.Desktop.Views.ConnectivityView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <StackPanel>
+      <!-- Header -->
+      <DockPanel Margin="0,0,0,18">
+        <StackPanel DockPanel.Dock="Left">
+          <TextBlock Text="Conectividade Local e Remota" Style="{StaticResource PageTitleStyle}" />
+          <TextBlock Text="Gerenciamento automático de rotas (LAN/mDNS prioritária e VPN Tailscale para redes externas)."
+                     Style="{StaticResource PageSubtitleStyle}"
+                     Margin="0,4,0,0" />
+        </StackPanel>
+        <CheckBox DockPanel.Dock="Right"
+                  VerticalAlignment="Center"
+                  Content="Reconexão automática"
+                  IsChecked="{Binding AutoReconnectEnabled, Mode=TwoWay}"
+                  Foreground="{StaticResource TextPrimaryBrush}"
+                  FontSize="12"
+                  Margin="12,0,0,0" />
+      </DockPanel>
+
+      <!-- Live Telemetry KPI Grid -->
+      <UniformGrid Columns="3" Margin="0,0,0,16">
+        <Border Style="{StaticResource NexusCardStyle}" Margin="0,0,12,12">
+          <StackPanel>
+            <TextBlock Text="ESTADO DA CONEXÃO" Style="{StaticResource LabelMutedStyle}" />
+            <TextBlock Text="{Binding ConnectionStateText}" Foreground="{StaticResource CyanAccentBrush}" FontSize="20" FontWeight="Bold" Margin="0,6,0,2" />
+            <TextBlock Text="{Binding DeviceNameText}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </Border>
+
+        <Border Style="{StaticResource NexusCardStyle}" Margin="0,0,12,12">
+          <StackPanel>
+            <TextBlock Text="TIPO DE ROTA E ENDPOINT" Style="{StaticResource LabelMutedStyle}" />
+            <TextBlock Text="{Binding RouteTypeText}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="17" FontWeight="Bold" Margin="0,6,0,2" />
+            <TextBlock Text="{Binding ActiveEndpointText}" Foreground="{StaticResource TextSecondaryBrush}" FontFamily="Consolas" FontSize="11" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </Border>
+
+        <Border Style="{StaticResource NexusCardStyle}" Margin="0,0,0,12">
+          <StackPanel>
+            <TextBlock Text="LATÊNCIA &amp; ÚLTIMA CONEXÃO" Style="{StaticResource LabelMutedStyle}" />
+            <TextBlock Text="{Binding LatencyText}" Foreground="{StaticResource SuccessBrush}" FontSize="20" FontWeight="Bold" Margin="0,6,0,2" />
+            <TextBlock Text="{Binding LastConnectedText, StringFormat='Última: {0}'}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" />
+          </StackPanel>
+        </Border>
+      </UniformGrid>
+
+      <!-- VPN & Local Interfaces Banner -->
+      <Border Style="{StaticResource NexusElevatedCardStyle}" Margin="0,0,0,16">
+        <StackPanel>
+          <DockPanel Margin="0,0,0,6">
+            <TextBlock Text="Estado da VPN (Tailscale) &amp; Interfaces deste Computador"
+                       Style="{StaticResource CardHeaderStyle}"
+                       DockPanel.Dock="Left" />
+            <TextBlock Text="{Binding VpnStateText}"
+                       Foreground="{StaticResource CyanAccentBrush}"
+                       FontSize="12"
+                       FontWeight="SemiBold"
+                       HorizontalAlignment="Right"
+                       DockPanel.Dock="Right" />
+          </DockPanel>
+          <TextBlock Text="{Binding LocalHostAddressesText}"
+                     Foreground="{StaticResource TextSecondaryBrush}"
+                     FontFamily="Consolas"
+                     FontSize="11"
+                     TextWrapping="Wrap" />
+          <TextBlock Text="{Binding DiagnosticMessage}"
+                     Foreground="{StaticResource TextPrimaryBrush}"
+                     FontSize="12"
+                     TextWrapping="Wrap"
+                     Margin="0,8,0,0" />
+        </StackPanel>
+      </Border>
+
+      <!-- Action Buttons -->
+      <WrapPanel Margin="0,0,0,16">
+        <Button Content="Selecionar Melhor Rota"
+                Command="{Binding SelectBestRouteCommand}"
+                Style="{StaticResource NexusPrimaryButtonStyle}"
+                Margin="0,0,10,8" />
+        <Button Content="Descobrir mDNS (LAN)"
+                Command="{Binding DiscoverMdnsCommand}"
+                Style="{StaticResource NexusSecondaryButtonStyle}"
+                Margin="0,0,10,8" />
+        <Button Content="Verificar Rotas"
+                Command="{Binding ProbeAllCommand}"
+                Style="{StaticResource NexusSecondaryButtonStyle}"
+                Margin="0,0,10,8" />
+        <Button Content="Atualizar Interfaces"
+                Command="{Binding InitializeCommand}"
+                Style="{StaticResource NexusSecondaryButtonStyle}"
+                Margin="0,0,10,8" />
+        <Button Content="Desconectar"
+                Command="{Binding DisconnectCommand}"
+                Style="{StaticResource NexusDangerButtonStyle}"
+                Margin="0,0,0,8" />
+      </WrapPanel>
+
+      <!-- Add Manual / Tailscale Endpoint Form -->
+      <Border Style="{StaticResource NexusCardStyle}" Margin="0,0,0,16">
+        <StackPanel>
+          <TextBlock Text="Cadastrar Endpoint Manual ou Tailscale" Style="{StaticResource CardHeaderStyle}" Margin="0,0,0,12" />
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="1*" />
+              <ColumnDefinition Width="10" />
+              <ColumnDefinition Width="1.6*" />
+              <ColumnDefinition Width="10" />
+              <ColumnDefinition Width="1.1*" />
+              <ColumnDefinition Width="10" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBox Grid.Column="0" Text="{Binding NewEndpointLabel, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource NexusTextBoxStyle}" ToolTip="Etiqueta (ex: Tailscale Casa)" />
+            <TextBox Grid.Column="2" Text="{Binding NewEndpointUrl, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource NexusTextBoxStyle}" ToolTip="https://100.x.y.z:5443 ou https://192.168.1.x:5443" />
+            <ComboBox Grid.Column="4"
+                      ItemsSource="{Binding AvailableRouteKinds}"
+                      SelectedItem="{Binding NewEndpointRouteKind}"
+                      Background="{StaticResource NavyDeepestBrush}"
+                      Foreground="{StaticResource TextPrimaryBrush}"
+                      Padding="8" />
+            <Button Grid.Column="6" Content="Adicionar" Command="{Binding AddEndpointCommand}" Style="{StaticResource NexusPrimaryButtonStyle}" />
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <!-- Registered Endpoints List -->
+      <Border Style="{StaticResource NexusCardStyle}">
+        <StackPanel>
+          <TextBlock Text="Rotas Configuradas (Local -> Remoto/VPN)" Style="{StaticResource CardHeaderStyle}" Margin="0,0,0,12" />
+          <ItemsControl ItemsSource="{Binding Endpoints}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Background="{StaticResource NavyDeepestBrush}"
+                        BorderBrush="{StaticResource NavyBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="10"
+                        Padding="12"
+                        Margin="0,0,0,8">
+                  <DockPanel>
+                    <Button DockPanel.Dock="Right"
+                            Content="Remover"
+                            Command="{Binding DataContext.RemoveEndpointCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            CommandParameter="{Binding EndpointId}"
+                            Style="{StaticResource NexusSecondaryButtonStyle}"
+                            VerticalAlignment="Center"
+                            Margin="12,0,0,0" />
+                    <StackPanel>
+                      <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{Binding Label}" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="14" />
+                        <TextBlock Text="{Binding RouteKindText, StringFormat=' · {0}'}" Foreground="{StaticResource CyanAccentBrush}" FontSize="12" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding StatusText, StringFormat=' [{0}]'}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" />
+                      </StackPanel>
+                      <TextBlock Text="{Binding EndpointUrl}" Foreground="{StaticResource TextSecondaryBrush}" FontFamily="Consolas" FontSize="12" Margin="0,3,0,0" />
+                      <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,2,0,0">
+                        <Run Text="Latência: " />
+                        <Run Text="{Binding LatencyText, Mode=OneWay}" />
+                        <Run Text=" · Última conexão: " />
+                        <Run Text="{Binding LastConnectedText, Mode=OneWay}" />
+                      </TextBlock>
+                    </StackPanel>
+                  </DockPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>
+

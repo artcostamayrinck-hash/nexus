@@ -1,0 +1,172 @@
+<Window x:Class="Nexus.Desktop.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:Nexus.Desktop.Views"
+        Title="NEXUS · Ecossistema Pessoal"
+        Width="1160"
+        Height="740"
+        MinWidth="880"
+        MinHeight="580"
+        Background="{StaticResource NavyBaseBrush}"
+        Foreground="{StaticResource TextPrimaryBrush}"
+        WindowStartupLocation="CenterScreen">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="*" />
+      <RowDefinition Height="34" />
+    </Grid.RowDefinitions>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="250" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
+
+    <!-- Left Sidebar -->
+    <Border Grid.Row="0"
+            Grid.Column="0"
+            Background="{StaticResource NavyDeepestBrush}"
+            BorderBrush="{StaticResource NavyBorderBrush}"
+            BorderThickness="0,0,1,0"
+            Padding="16,20">
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Top" Margin="6,0,6,26">
+          <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <Border Width="34" Height="34" CornerRadius="10" Background="{StaticResource BlueAccentBrush}" Margin="0,0,10,0">
+              <TextBlock Text="N"
+                         Foreground="{StaticResource TextPrimaryBrush}"
+                         FontSize="18"
+                         FontWeight="Bold"
+                         HorizontalAlignment="Center"
+                         VerticalAlignment="Center" />
+            </Border>
+            <StackPanel>
+              <TextBlock Text="NEXUS"
+                         Foreground="{StaticResource TextPrimaryBrush}"
+                         FontSize="18"
+                         FontWeight="Bold" />
+              <TextBlock Text="Windows &amp; Android Hub"
+                         Foreground="{StaticResource CyanAccentBrush}"
+                         FontSize="11" />
+            </StackPanel>
+          </StackPanel>
+        </StackPanel>
+
+        <StackPanel DockPanel.Dock="Bottom" Margin="6,12,6,0">
+          <Border Background="{StaticResource NavySurfaceBrush}"
+                  BorderBrush="{StaticResource NavyBorderBrush}"
+                  BorderThickness="1"
+                  CornerRadius="10"
+                  Padding="12">
+            <StackPanel>
+              <TextBlock Text="FASE 01 · 02 · 03 · 04" Foreground="{StaticResource CyanAccentBrush}" FontSize="10" FontWeight="Bold" />
+              <TextBlock Text="LAN, mDNS, VPN Tailscale &amp; Pareamento QR" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
+        <ListBox ItemsSource="{Binding NavigationTabs}"
+                 SelectedValue="{Binding ActiveSection}"
+                 SelectedValuePath="Section"
+                 SelectionChanged="OnNavigationSelectionChanged"
+                 Background="Transparent"
+                 BorderThickness="0">
+          <ListBox.ItemContainerStyle>
+            <Style TargetType="ListBoxItem">
+              <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+              <Setter Property="Margin" Value="0,0,0,6" />
+              <Setter Property="Cursor" Value="Hand" />
+              <Setter Property="Template">
+                <Setter.Value>
+                  <ControlTemplate TargetType="ListBoxItem">
+                    <Border x:Name="NavBg"
+                            Background="Transparent"
+                            BorderBrush="Transparent"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="12,10">
+                      <ContentPresenter />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                      <Trigger Property="IsMouseOver" Value="True">
+                        <Setter TargetName="NavBg" Property="Background" Value="{StaticResource NavySurfaceBrush}" />
+                      </Trigger>
+                      <Trigger Property="IsSelected" Value="True">
+                        <Setter TargetName="NavBg" Property="Background" Value="{StaticResource NavyElevatedBrush}" />
+                        <Setter TargetName="NavBg" Property="BorderBrush" Value="{StaticResource CyanSoftBrush}" />
+                      </Trigger>
+                    </ControlTemplate.Triggers>
+                  </ControlTemplate>
+                </Setter.Value>
+              </Setter>
+            </Style>
+          </ListBox.ItemContainerStyle>
+          <ListBox.ItemTemplate>
+            <DataTemplate>
+              <StackPanel Orientation="Horizontal">
+                <Path Data="{Binding IconKey, Converter={StaticResource IconKeyToGeometryConverter}}"
+                      Fill="{StaticResource CyanAccentBrush}"
+                      Width="18"
+                      Height="18"
+                      Stretch="Uniform"
+                      VerticalAlignment="Center"
+                      Margin="0,0,12,0" />
+                <StackPanel>
+                  <TextBlock Text="{Binding Title}"
+                             Foreground="{StaticResource TextPrimaryBrush}"
+                             FontSize="14"
+                             FontWeight="SemiBold" />
+                  <TextBlock Text="{Binding Subtitle}"
+                             Foreground="{StaticResource TextMutedBrush}"
+                             FontSize="11" />
+                </StackPanel>
+              </StackPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </DockPanel>
+    </Border>
+
+    <!-- Main Content Viewport with Subtle Transition -->
+    <Grid x:Name="ContentHost" Grid.Row="0" Grid.Column="1" Margin="26,22,26,12">
+      <views:DashboardView DataContext="{Binding Dashboard}"
+                           Visibility="{Binding DataContext.ActiveSection, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource SectionVisibilityConverter}, ConverterParameter=Dashboard}" />
+      <views:ConnectivityView DataContext="{Binding Connectivity}"
+                              Visibility="{Binding DataContext.ActiveSection, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource SectionVisibilityConverter}, ConverterParameter=Connectivity}" />
+      <views:RealtimeView DataContext="{Binding Realtime}"
+                          Visibility="{Binding DataContext.ActiveSection, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource SectionVisibilityConverter}, ConverterParameter=Realtime}" />
+      <views:SyncView DataContext="{Binding Sync}"
+                      Visibility="{Binding DataContext.ActiveSection, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource SectionVisibilityConverter}, ConverterParameter=Sync}" />
+      <views:PairingView DataContext="{Binding Pairing}"
+                         Visibility="{Binding DataContext.ActiveSection, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource SectionVisibilityConverter}, ConverterParameter=Pairing}" />
+      <views:DevicesView DataContext="{Binding Devices}"
+                         Visibility="{Binding DataContext.ActiveSection, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource SectionVisibilityConverter}, ConverterParameter=Devices}" />
+      <views:SystemStatusView DataContext="{Binding SystemStatus}"
+                              Visibility="{Binding DataContext.ActiveSection, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource SectionVisibilityConverter}, ConverterParameter=SystemStatus}" />
+      <views:SettingsView DataContext="{Binding Settings}"
+                          Visibility="{Binding DataContext.ActiveSection, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource SectionVisibilityConverter}, ConverterParameter=Settings}" />
+    </Grid>
+
+    <!-- Bottom System Status Bar -->
+    <Border Grid.Row="1"
+            Grid.Column="0"
+            Grid.ColumnSpan="2"
+            Background="{StaticResource NavyDeepestBrush}"
+            BorderBrush="{StaticResource NavyBorderBrush}"
+            BorderThickness="0,1,0,0"
+            Padding="16,0">
+      <DockPanel VerticalAlignment="Center">
+        <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+          <Ellipse Width="8" Height="8" Fill="{StaticResource CyanAccentBrush}" Margin="0,0,8,0" />
+          <TextBlock Text="{Binding FooterStatusText}"
+                     Foreground="{StaticResource TextSecondaryBrush}"
+                     FontSize="12" />
+        </StackPanel>
+        <TextBlock Text="{Binding FooterDeviceText}"
+                   DockPanel.Dock="Right"
+                   HorizontalAlignment="Right"
+                   Foreground="{StaticResource TextMutedBrush}"
+                   FontSize="12" />
+      </DockPanel>
+    </Border>
+  </Grid>
+</Window>
+

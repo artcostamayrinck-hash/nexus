@@ -1,0 +1,246 @@
+<UserControl x:Class="Nexus.Desktop.Views.DevicesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <DockPanel Margin="0,0,0,16">
+      <StackPanel DockPanel.Dock="Left">
+        <TextBlock Text="Gerenciamento de Dispositivos &amp; Confiança" Style="{StaticResource PageTitleStyle}" />
+        <TextBlock Text="Visualize dispositivos pareados, identidades ECDSA, último acesso, renomeie, ajuste permissões ou revogue confiança."
+                   Style="{StaticResource PageSubtitleStyle}"
+                   Margin="0,4,0,0" />
+      </StackPanel>
+      <Button Content="Atualizar Lista"
+              AutomationProperties.Name="Atualizar Dispositivos Confiáveis"
+              Command="{Binding LoadDevicesCommand}"
+              Style="{StaticResource NexusSecondaryButtonStyle}"
+              DockPanel.Dock="Right"
+              HorizontalAlignment="Right"
+              VerticalAlignment="Center" />
+    </DockPanel>
+
+    <!-- Main Split: Trusted Devices List + Selected Inspector -->
+    <Grid Grid.Row="1">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="1.05*" />
+        <ColumnDefinition Width="16" />
+        <ColumnDefinition Width="0.95*" />
+      </Grid.ColumnDefinitions>
+
+      <!-- Trusted Devices List -->
+      <Border Grid.Column="0" Style="{StaticResource NexusCardStyle}">
+        <DockPanel>
+          <TextBlock DockPanel.Dock="Top"
+                     Text="{Binding FeedbackMessage}"
+                     Foreground="{StaticResource CyanAccentBrush}"
+                     FontSize="12"
+                     Margin="0,0,0,12" />
+
+          <ListBox ItemsSource="{Binding TrustedDeviceItems}"
+                   SelectedItem="{Binding SelectedTrustedItem}"
+                   Background="Transparent"
+                   BorderThickness="0"
+                   ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListBox.ItemContainerStyle>
+              <Style TargetType="ListBoxItem">
+                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="Margin" Value="0,0,0,8" />
+                <Setter Property="Template">
+                  <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                      <Border x:Name="RowBorder"
+                              Background="{StaticResource NavyElevatedBrush}"
+                              BorderBrush="{StaticResource NavyBorderBrush}"
+                              BorderThickness="1"
+                              CornerRadius="10"
+                              Padding="14">
+                        <ContentPresenter />
+                      </Border>
+                      <ControlTemplate.Triggers>
+                        <Trigger Property="IsSelected" Value="True">
+                          <Setter TargetName="RowBorder" Property="BorderBrush" Value="{StaticResource CyanAccentBrush}" />
+                        </Trigger>
+                      </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                  </Setter.Value>
+                </Setter>
+              </Style>
+            </ListBox.ItemContainerStyle>
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <TextBlock Text="{Binding Device.CustomName}"
+                               Foreground="{StaticResource TextPrimaryBrush}"
+                               FontSize="15"
+                               FontWeight="SemiBold" />
+                    <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,3,0,0">
+                      <Run Text="{Binding Device.Platform}" />
+                      <Run Text=" · " />
+                      <Run Text="{Binding Device.DeviceType}" />
+                      <Run Text=" · " />
+                      <Run Text="{Binding Device.OperatingSystemVersion}" />
+                    </TextBlock>
+                    <TextBlock Foreground="{StaticResource TextMutedBrush}" FontFamily="Consolas" FontSize="11" Margin="0,4,0,0">
+                      <Run Text="ID: " />
+                      <Run Text="{Binding Device.DeviceId}" />
+                    </TextBlock>
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
+                    <Border Background="{StaticResource NavyDeepestBrush}"
+                            BorderBrush="{Binding Device.TrustStatus, Converter={StaticResource TrustStatusToBrushConverter}}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="10,4"
+                            Margin="0,0,0,4">
+                      <TextBlock Text="{Binding Device.TrustStatus}"
+                                 Foreground="{Binding Device.TrustStatus, Converter={StaticResource TrustStatusToBrushConverter}}"
+                                 FontSize="11"
+                                 FontWeight="SemiBold"
+                                 HorizontalAlignment="Center" />
+                    </Border>
+                    <TextBlock Text="{Binding ConnectionBadgeText}"
+                               Foreground="{StaticResource CyanAccentBrush}"
+                               FontSize="11"
+                               FontWeight="SemiBold"
+                               HorizontalAlignment="Right" />
+                  </StackPanel>
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </DockPanel>
+      </Border>
+
+      <!-- Selected Device Inspector & Actions -->
+      <Border Grid.Column="2" Style="{StaticResource NexusCardStyle}">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel>
+            <TextBlock Text="Detalhes &amp; Controle de Confiança" Style="{StaticResource CardHeaderStyle}" Margin="0,0,0,12" />
+
+            <Border Style="{StaticResource NexusElevatedCardStyle}" Margin="0,0,0,12">
+              <StackPanel>
+                <DockPanel>
+                  <TextBlock Text="Estado de Confiança" Style="{StaticResource LabelMutedStyle}" />
+                  <TextBlock Text="{Binding SelectedTrustBadge}"
+                             Foreground="{StaticResource CyanAccentBrush}"
+                             FontWeight="SemiBold"
+                             HorizontalAlignment="Right" />
+                </DockPanel>
+                <DockPanel Margin="0,4,0,0">
+                  <TextBlock Text="Conexão Real-Time" Style="{StaticResource LabelMutedStyle}" />
+                  <TextBlock Text="{Binding SelectedConnectionBadge}"
+                             Foreground="{StaticResource TextPrimaryBrush}"
+                             FontWeight="SemiBold"
+                             HorizontalAlignment="Right" />
+                </DockPanel>
+                <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,8,0,0">
+                  <Run Text="Pareado em: " />
+                  <Run Text="{Binding SelectedPairedAtText, Mode=OneWay}" Foreground="{StaticResource TextPrimaryBrush}" />
+                </TextBlock>
+                <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,4,0,0">
+                  <Run Text="Último acesso: " />
+                  <Run Text="{Binding SelectedLastAccessText, Mode=OneWay}" Foreground="{StaticResource TextPrimaryBrush}" />
+                </TextBlock>
+                <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" Margin="0,6,0,0">
+                  <Run Text="Impressão Digital ECDSA: " />
+                </TextBlock>
+                <TextBlock Text="{Binding SelectedFingerprintDisplay}"
+                           Foreground="{StaticResource CyanAccentBrush}"
+                           FontFamily="Consolas"
+                           FontSize="11"
+                           TextWrapping="Wrap"
+                           Margin="0,2,0,0" />
+              </StackPanel>
+            </Border>
+
+            <!-- Rename Device -->
+            <TextBlock Text="Renomear Dispositivo" Style="{StaticResource LabelMutedStyle}" Margin="0,0,0,6" />
+            <Grid Margin="0,0,0,14">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <TextBox Grid.Column="0"
+                       Text="{Binding EditTrustedName, UpdateSourceTrigger=PropertyChanged}"
+                       AutomationProperties.Name="Novo Nome do Dispositivo Confiável"
+                       Style="{StaticResource NexusTextBoxStyle}" />
+              <Button Grid.Column="2"
+                      Content="Salvar Nome"
+                      AutomationProperties.Name="Salvar Nome do Dispositivo"
+                      Command="{Binding RenameTrustedDeviceCommand}"
+                      Style="{StaticResource NexusSecondaryButtonStyle}" />
+            </Grid>
+
+            <!-- Permissions -->
+            <TextBlock Text="Permissões Autorizadas" Style="{StaticResource LabelMutedStyle}" Margin="0,0,0,6" />
+            <UniformGrid Columns="2" Margin="0,0,0,10">
+              <CheckBox Content="Status &amp; Saúde" IsChecked="{Binding PermViewStatus}" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,4" />
+              <CheckBox Content="Notificações" IsChecked="{Binding PermNotifications}" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,4" />
+              <CheckBox Content="Área de Transf." IsChecked="{Binding PermClipboard}" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,4" />
+              <CheckBox Content="Transferência" IsChecked="{Binding PermFileTransfer}" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,4" />
+              <CheckBox Content="Controle Remoto" IsChecked="{Binding PermRemoteCommands}" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,4" />
+              <CheckBox Content="Gerenciar Disp." IsChecked="{Binding PermManageDevices}" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,4" />
+            </UniformGrid>
+            <Button Content="Atualizar Permissões"
+                    AutomationProperties.Name="Atualizar Permissões do Dispositivo"
+                    Command="{Binding UpdateTrustedPermissionsCommand}"
+                    Style="{StaticResource NexusSecondaryButtonStyle}"
+                    Margin="0,0,0,16" />
+
+            <!-- Revoke / Remove -->
+            <TextBlock Text="Motivo da Revogação" Style="{StaticResource LabelMutedStyle}" Margin="0,0,0,6" />
+            <TextBox Text="{Binding RevokeReason, UpdateSourceTrigger=PropertyChanged}"
+                     AutomationProperties.Name="Motivo da Revogação de Acesso"
+                     Style="{StaticResource NexusTextBoxStyle}"
+                     Margin="0,0,0,10" />
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="10" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <Button Grid.Column="0"
+                      Content="Revogar Acesso"
+                      AutomationProperties.Name="Revogar Acesso do Dispositivo"
+                      Command="{Binding RevokeTrustedDeviceCommand}"
+                      Style="{StaticResource NexusDangerButtonStyle}" />
+              <Button Grid.Column="2"
+                      Content="Remover Dispositivo"
+                      AutomationProperties.Name="Remover Dispositivo Confiável"
+                      Command="{Binding RemoveTrustedDeviceCommand}"
+                      Style="{StaticResource NexusSecondaryButtonStyle}" />
+            </Grid>
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
+    </Grid>
+
+    <!-- Local Registry Footer Summary -->
+    <Border Grid.Row="2" Style="{StaticResource NexusElevatedCardStyle}" Margin="0,12,0,0" Padding="14,10">
+      <DockPanel>
+        <TextBlock Text="{Binding Devices.Count, StringFormat='Inventário local SQLite: {0} dispositivo(s) conhecido(s)'}"
+                   Foreground="{StaticResource TextSecondaryBrush}"
+                   FontSize="12"
+                   VerticalAlignment="Center" />
+        <TextBlock Text="{Binding AuthorizedTrustedCount, StringFormat='{}{0} autorizado(s) via criptografia'}"
+                   Foreground="{StaticResource CyanAccentBrush}"
+                   FontSize="12"
+                   FontWeight="SemiBold"
+                   HorizontalAlignment="Right"
+                   VerticalAlignment="Center" />
+      </DockPanel>
+    </Border>
+  </Grid>
+</UserControl>

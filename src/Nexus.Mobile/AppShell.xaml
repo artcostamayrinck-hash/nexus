@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+       xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+       xmlns:views="clr-namespace:Nexus.Mobile.Views"
+       x:Class="Nexus.Mobile.AppShell"
+       Shell.TabBarBackgroundColor="{StaticResource NavyDeepest}"
+       Shell.TabBarForegroundColor="{StaticResource CyanAccent}"
+       Shell.TabBarTitleColor="{StaticResource CyanAccent}"
+       Shell.TabBarUnselectedColor="{StaticResource TextMuted}"
+       BackgroundColor="{StaticResource NavyBase}">
+  <TabBar>
+    <ShellContent Title="Início" Route="home" ContentTemplate="{DataTemplate views:HomePage}" />
+    <ShellContent Title="Conexão" Route="connection" ContentTemplate="{DataTemplate views:ConnectionPage}" />
+    <ShellContent Title="Rotas" Route="routes" ContentTemplate="{DataTemplate views:RoutesPage}" />
+    <ShellContent Title="Tempo Real" Route="realtime" ContentTemplate="{DataTemplate views:RealtimePage}" />
+    <ShellContent Title="Sincronizar" Route="sync" ContentTemplate="{DataTemplate views:SyncPage}" />
+    <ShellContent Title="Dispositivos" Route="devices" ContentTemplate="{DataTemplate views:DevicesPage}" />
+    <ShellContent Title="Ajustes" Route="settings" ContentTemplate="{DataTemplate views:SettingsPage}" />
+  </TabBar>
+</Shell>
+

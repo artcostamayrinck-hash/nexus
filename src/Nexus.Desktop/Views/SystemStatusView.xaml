@@ -1,0 +1,128 @@
+<UserControl x:Class="Nexus.Desktop.Views.SystemStatusView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+
+    <Grid Margin="0,0,0,16">
+      <StackPanel>
+        <TextBlock Text="Status do Sistema" Style="{StaticResource PageTitleStyle}" />
+        <TextBlock Text="{Binding LastCheckedText}" Style="{StaticResource PageSubtitleStyle}" Margin="0,4,0,0" />
+      </StackPanel>
+      <Button Content="Atualizar Diagnóstico"
+              AutomationProperties.Name="Atualizar Diagnóstico"
+              Command="{Binding RefreshCommand}"
+              Style="{StaticResource NexusPrimaryButtonStyle}"
+              HorizontalAlignment="Right"
+              VerticalAlignment="Center" />
+    </Grid>
+
+    <!-- Storage & Modules Summary -->
+    <UniformGrid Grid.Row="1" Columns="3" Margin="0,0,0,16">
+      <Border Style="{StaticResource NexusCardStyle}" Margin="0,0,8,0">
+        <StackPanel>
+          <TextBlock Text="ESTADO GERAL" Style="{StaticResource LabelMutedStyle}" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding OverallHealthLabel}"
+                     Foreground="{StaticResource SuccessBrush}"
+                     FontSize="20"
+                     FontWeight="Bold"
+                     Margin="0,6,0,4" />
+          <TextBlock Text="{Binding StorageRootPath}"
+                     Foreground="{StaticResource TextMutedBrush}"
+                     FontSize="11"
+                     TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+      </Border>
+      <Border Style="{StaticResource NexusCardStyle}" Margin="4,0,4,0">
+        <StackPanel>
+          <TextBlock Text="BANCO SQLITE" Style="{StaticResource LabelMutedStyle}" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding DatabaseSizeText}"
+                     Foreground="{StaticResource CyanAccentBrush}"
+                     FontSize="20"
+                     FontWeight="Bold"
+                     Margin="0,6,0,4" />
+          <TextBlock Text="WAL + Foreign Keys ativos"
+                     Foreground="{StaticResource TextSecondaryBrush}"
+                     FontSize="12" />
+        </StackPanel>
+      </Border>
+      <Border Style="{StaticResource NexusCardStyle}" Margin="8,0,0,0">
+        <StackPanel>
+          <TextBlock Text="ARQUIVOS INTERNOS" Style="{StaticResource LabelMutedStyle}" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding ManagedFilesCount}"
+                     Foreground="{StaticResource TextPrimaryBrush}"
+                     FontSize="20"
+                     FontWeight="Bold"
+                     Margin="0,6,0,4" />
+          <TextBlock Text="Buckets protegidos contra traversal"
+                     Foreground="{StaticResource TextSecondaryBrush}"
+                     FontSize="12" />
+        </StackPanel>
+      </Border>
+    </UniformGrid>
+
+    <!-- Modules & Live Logs -->
+    <Grid Grid.Row="2">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="1.5*" />
+      </Grid.ColumnDefinitions>
+
+      <Border Style="{StaticResource NexusCardStyle}" Margin="0,0,8,0">
+        <DockPanel>
+          <TextBlock DockPanel.Dock="Top" Text="Módulos Registrados" Style="{StaticResource CardHeaderStyle}" Margin="0,0,0,12" />
+          <ItemsControl ItemsSource="{Binding Modules}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Background="{StaticResource NavyElevatedBrush}"
+                        BorderBrush="{StaticResource NavyBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="10"
+                        Padding="12"
+                        Margin="0,0,0,8">
+                  <StackPanel>
+                    <DockPanel>
+                      <TextBlock Text="{Binding DisplayName}" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" />
+                      <TextBlock Text="{Binding State}" Foreground="{StaticResource CyanAccentBrush}" FontSize="11" HorizontalAlignment="Right" />
+                    </DockPanel>
+                    <TextBlock Text="{Binding Description}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0" />
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </DockPanel>
+      </Border>
+
+      <Border Grid.Column="1" Style="{StaticResource NexusCardStyle}" Margin="8,0,0,0">
+        <DockPanel>
+          <TextBlock DockPanel.Dock="Top" Text="Logs Estruturados (Serilog)" Style="{StaticResource CardHeaderStyle}" Margin="0,0,0,12" />
+          <ListBox ItemsSource="{Binding RecentLogs}"
+                   Background="{StaticResource NavyDeepestBrush}"
+                   BorderBrush="{StaticResource NavyBorderBrush}"
+                   BorderThickness="1">
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <StackPanel Margin="4,3">
+                  <TextBlock Foreground="{StaticResource CyanAccentBrush}" FontFamily="Consolas" FontSize="11">
+                    <Run Text="{Binding Timestamp, StringFormat={}{0:HH:mm:ss}}" />
+                    <Run Text=" [" />
+                    <Run Text="{Binding Level}" />
+                    <Run Text="] " />
+                    <Run Text="{Binding SourceContext}" />
+                  </TextBlock>
+                  <TextBlock Text="{Binding Message}" Foreground="{StaticResource TextPrimaryBrush}" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" />
+                </StackPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </DockPanel>
+      </Border>
+    </Grid>
+  </Grid>
+</UserControl>
+

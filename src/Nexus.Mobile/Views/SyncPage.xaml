@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Nexus.Mobile.Views.SyncPage"
+             Title="Sincronizar">
+  <ScrollView>
+    <VerticalStackLayout Padding="20" Spacing="14">
+      <Label Text="Sincronização NEXUS" FontSize="24" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+      <Label Text="{Binding StatusMessage}" FontSize="12" TextColor="{StaticResource CyanAccent}" />
+
+      <!-- Sync Status Card -->
+      <Border Style="{StaticResource NexusCard}">
+        <VerticalStackLayout Spacing="4">
+          <Label Text="ESTADO DE SINCRONIZAÇÃO" FontSize="11" FontAttributes="Bold" TextColor="{StaticResource TextMuted}" />
+          <Label Text="{Binding SyncStatusText}" FontSize="20" FontAttributes="Bold" TextColor="{StaticResource CyanAccent}" />
+          <Label Text="{Binding LastSyncText, StringFormat='Última sincronização: {0}'}" FontSize="12" TextColor="{StaticResource TextSecondary}" />
+          <Label Text="{Binding PendingQueueText}" FontSize="12" TextColor="{StaticResource TextPrimary}" />
+          <Label Text="{Binding ConflictsCountText}" FontSize="12" TextColor="{StaticResource TextSecondary}" />
+          <Button Text="Sincronizar Agora" Command="{Binding SyncNowCommand}" Style="{StaticResource PrimaryButton}" Margin="0,6,0,0" />
+        </VerticalStackLayout>
+      </Border>
+
+      <!-- Android OS Restriction & Privacy Toggles -->
+      <Border Style="{StaticResource NexusCard}">
+        <VerticalStackLayout Spacing="8">
+          <Label Text="PRIVACIDADE &amp; RESTRIÇÕES DO ANDROID" FontSize="11" FontAttributes="Bold" TextColor="{StaticResource TextMuted}" />
+          <Label Text="{Binding PlatformRestrictionText}" FontSize="12" TextColor="{StaticResource CyanAccent}" />
+          <Grid ColumnDefinitions="*,Auto">
+            <Label Text="Sincronizar Clipboard" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center" />
+            <Switch Grid.Column="1" IsToggled="{Binding ClipboardSyncEnabled}" />
+          </Grid>
+          <Grid ColumnDefinitions="*,Auto">
+            <Label Text="Sincronizar Notas" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center" />
+            <Switch Grid.Column="1" IsToggled="{Binding NotesSyncEnabled}" />
+          </Grid>
+          <Button Text="Salvar Preferências" Command="{Binding SavePrivacyCommand}" Style="{StaticResource SecondaryButton}" />
+        </VerticalStackLayout>
+      </Border>
+
+      <!-- Clipboard Section -->
+      <Border Style="{StaticResource NexusCard}">
+        <VerticalStackLayout Spacing="8">
+          <Label Text="NEXUS Clipboard (Primeiro Plano)" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+          <Editor Placeholder="Digite ou cole um texto para enviar ao Windows..."
+                  Text="{Binding ClipboardDraftText}"
+                  HeightRequest="80"
+                  TextColor="{StaticResource TextPrimary}"
+                  PlaceholderColor="{StaticResource TextMuted}" />
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+            <Button Text="Enviar Texto" Command="{Binding SendClipboardDraftCommand}" Style="{StaticResource PrimaryButton}" />
+            <Button Grid.Column="1" Text="Ler Clipboard" Command="{Binding CaptureForegroundClipboardCommand}" Style="{StaticResource SecondaryButton}" />
+          </Grid>
+          <Button Text="Limpar Histórico" Command="{Binding ClearClipboardCommand}" Style="{StaticResource SecondaryButton}" />
+
+          <CollectionView ItemsSource="{Binding ClipboardHistory}" HeightRequest="170">
+            <CollectionView.ItemTemplate>
+              <DataTemplate>
+                <Border Style="{StaticResource NexusCard}" Margin="0,0,0,6" Padding="10">
+                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <VerticalStackLayout Spacing="2">
+                      <Label Text="{Binding ContentText}" TextColor="{StaticResource TextPrimary}" MaxLines="3" LineBreakMode="TailTruncation" />
+                      <Label Text="{Binding OriginDeviceName}" FontSize="11" TextColor="{StaticResource TextMuted}" />
+                    </VerticalStackLayout>
+                    <Button Grid.Column="1"
+                            Text="Copiar"
+                            Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.CopyEntryCommand}"
+                            CommandParameter="{Binding}"
+                            Style="{StaticResource SecondaryButton}" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </CollectionView.ItemTemplate>
+          </CollectionView>
+        </VerticalStackLayout>
+      </Border>
+
+      <!-- Notes Section -->
+      <Border Style="{StaticResource NexusCard}">
+        <VerticalStackLayout Spacing="8">
+          <Label Text="NEXUS Notes" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+          <SearchBar Placeholder="Pesquisar notas..." Text="{Binding SearchQuery}" TextColor="{StaticResource TextPrimary}" />
+          <Entry Placeholder="Título da nota" Text="{Binding NoteTitleInput}" TextColor="{StaticResource TextPrimary}" PlaceholderColor="{StaticResource TextMuted}" />
+          <Editor Placeholder="Conteúdo da nota..." Text="{Binding NoteBodyInput}" HeightRequest="100" TextColor="{StaticResource TextPrimary}" PlaceholderColor="{StaticResource TextMuted}" />
+          <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6">
+            <Button Text="Nova" Command="{Binding NewNoteCommand}" Style="{StaticResource SecondaryButton}" />
+            <Button Grid.Column="1" Text="Salvar" Command="{Binding SaveNoteCommand}" Style="{StaticResource PrimaryButton}" />
+            <Button Grid.Column="2" Text="Excluir" Command="{Binding DeleteSelectedNoteCommand}" Style="{StaticResource SecondaryButton}" />
+          </Grid>
+
+          <CollectionView ItemsSource="{Binding Notes}" SelectionMode="Single" SelectedItem="{Binding SelectedNote}" HeightRequest="160">
+            <CollectionView.ItemTemplate>
+              <DataTemplate>
+                <Border Style="{StaticResource NexusCard}" Margin="0,0,0,6" Padding="10">
+                  <VerticalStackLayout Spacing="2">
+                    <Label Text="{Binding Title}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+                    <Label Text="{Binding Version, StringFormat='v{0}'}" FontSize="11" TextColor="{StaticResource TextMuted}" />
+                  </VerticalStackLayout>
+                </Border>
+              </DataTemplate>
+            </CollectionView.ItemTemplate>
+          </CollectionView>
+
+          <Label Text="Conflitos Detectados" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+          <CollectionView ItemsSource="{Binding Conflicts}" SelectionMode="Single" SelectedItem="{Binding SelectedConflict}" HeightRequest="110">
+            <CollectionView.ItemTemplate>
+              <DataTemplate>
+                <Border Style="{StaticResource NexusCard}" Margin="0,0,0,6" Padding="10">
+                  <VerticalStackLayout>
+                    <Label Text="{Binding LocalTitle}" TextColor="{StaticResource CyanAccent}" FontAttributes="Bold" />
+                    <Label Text="{Binding RemoteDeviceName, StringFormat='Conflito com {0}'}" FontSize="11" TextColor="{StaticResource TextSecondary}" />
+                  </VerticalStackLayout>
+                </Border>
+              </DataTemplate>
+            </CollectionView.ItemTemplate>
+          </CollectionView>
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+            <Button Text="Manter Local" Command="{Binding KeepLocalConflictCommand}" Style="{StaticResource SecondaryButton}" />
+            <Button Grid.Column="1" Text="Aceitar Remota" Command="{Binding AcceptRemoteConflictCommand}" Style="{StaticResource PrimaryButton}" />
+          </Grid>
+        </VerticalStackLayout>
+      </Border>
+    </VerticalStackLayout>
+  </ScrollView>
+</ContentPage>
+

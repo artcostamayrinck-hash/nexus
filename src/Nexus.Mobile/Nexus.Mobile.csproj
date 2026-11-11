@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Nexus.Mobile</RootNamespace>
+    <UseMaui>true</UseMaui>
+    <SingleProject>true</SingleProject>
+    <ApplicationTitle>NEXUS</ApplicationTitle>
+    <ApplicationId>com.nexus.ecosystem</ApplicationId>
+    <ApplicationDisplayVersion>0.2.0</ApplicationDisplayVersion>
+    <ApplicationVersion>2</ApplicationVersion>
+    <SupportedOSPlatformVersion>26.0</SupportedOSPlatformVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Nexus.Contracts\Nexus.Contracts.csproj" />
+    <ProjectReference Include="..\Nexus.Core\Nexus.Core.csproj" />
+    <ProjectReference Include="..\Nexus.Infrastructure\Nexus.Infrastructure.csproj" />
+    <ProjectReference Include="..\Nexus.Mobile.Services\Nexus.Mobile.Services.csproj" />
+    <ProjectReference Include="..\Nexus.Modules\Nexus.Modules.csproj" />
+    <ProjectReference Include="..\Nexus.Security\Nexus.Security.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Maui.Controls" />
+  </ItemGroup>
+</Project>
+

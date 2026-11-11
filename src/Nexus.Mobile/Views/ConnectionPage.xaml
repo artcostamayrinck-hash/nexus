@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Nexus.Mobile.Views.ConnectionPage"
+             Title="Pareamento &amp; Conexão">
+  <ScrollView>
+    <VerticalStackLayout Padding="20" Spacing="16">
+      <Label Text="Pareamento QR &amp; Conexão TLS" FontSize="24" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+      <Label Text="Leia o QR Code do Windows para estabelecer confiança ECDSA + TLS e autenticar a sessão." FontSize="13" TextColor="{StaticResource TextSecondary}" />
+
+      <!-- Pairing Status & SAS Verification Card -->
+      <Border Style="{StaticResource NexusCard}">
+        <VerticalStackLayout Spacing="10">
+          <Label Text="ESTADO DO PAREAMENTO" FontSize="11" FontAttributes="Bold" TextColor="{StaticResource TextMuted}" />
+          <Label Text="{Binding PairingStateLabel}" FontSize="20" FontAttributes="Bold" TextColor="{StaticResource CyanAccent}" />
+          <Label Text="{Binding VerificationCode, StringFormat='Código Mútuo: {0}'}"
+                 FontSize="22"
+                 FontAttributes="Bold"
+                 TextColor="{StaticResource TextPrimary}" />
+          <Label Text="{Binding PairedHostName, StringFormat='Host: {0}'}" FontSize="13" TextColor="{StaticResource TextSecondary}" />
+          <Label Text="{Binding PairedHostFingerprint, StringFormat='Chave: {0}'}" FontSize="11" TextColor="{StaticResource TextMuted}" />
+          <Label Text="{Binding PairingFeedback}" FontSize="13" TextColor="{StaticResource CyanAccent}" />
+        </VerticalStackLayout>
+      </Border>
+
+      <!-- QR Code Scanner / Payload Input -->
+      <Border Style="{StaticResource NexusCard}">
+        <VerticalStackLayout Spacing="10">
+          <Label Text="Payload do QR Code (Leitura / Colagem)" FontSize="12" TextColor="{StaticResource TextSecondary}" />
+          <Editor Text="{Binding QrInputText}"
+                  Placeholder="Cole o JSON assinado do QR Code ou utilize a câmera do dispositivo"
+                  AutoSize="TextChanges"
+                  MinimumHeightRequest="90"
+                  TextColor="{StaticResource TextPrimary}"
+                  BackgroundColor="{StaticResource NavyDeepest}" />
+
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+            <Button Text="Colar QR" Clicked="OnPasteQrClick" Style="{StaticResource SecondaryButton}" />
+            <Button Grid.Column="1" Text="Parear Agora" Command="{Binding SubmitQrPairingCommand}" Style="{StaticResource PrimaryButton}" />
+          </Grid>
+
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+            <Button Text="Verificar Aprovação" Command="{Binding CheckPairingStatusCommand}" Style="{StaticResource SecondaryButton}" />
+            <Button Grid.Column="1" Text="Renovar Token" Command="{Binding RefreshTokensCommand}" Style="{StaticResource SecondaryButton}" />
+          </Grid>
+
+          <Button Text="Reiniciar Pareamento" Command="{Binding ResetPairingCommand}" Style="{StaticResource SecondaryButton}" />
+        </VerticalStackLayout>
+      </Border>
+
+      <!-- Endpoint Health Diagnostics -->
+      <Border Style="{StaticResource NexusCard}">
+        <VerticalStackLayout Spacing="10">
+          <Label Text="DIAGNÓSTICO DE TRANSPORTE" FontSize="11" FontAttributes="Bold" TextColor="{StaticResource TextMuted}" />
+          <Label Text="{Binding StatusLabel}" FontSize="17" FontAttributes="Bold" TextColor="{StaticResource CyanAccent}" />
+          <Label Text="{Binding DetailText}" FontSize="13" TextColor="{StaticResource TextSecondary}" />
+          <Label Text="{Binding LatencyLabel, StringFormat='Latência: {0}'}" FontSize="12" TextColor="{StaticResource TextMuted}" />
+
+          <Label Text="Endereço do Servidor" FontSize="12" TextColor="{StaticResource TextSecondary}" Margin="0,6,0,0" />
+          <Entry Text="{Binding ServerEndpoint}" Placeholder="https://192.168.1.100:5443" Style="{StaticResource NexusEntry}" />
+
+          <Label Text="Transporte" FontSize="12" TextColor="{StaticResource TextSecondary}" />
+          <Picker ItemsSource="{Binding AvailableTransports}"
+                  SelectedItem="{Binding SelectedTransport}"
+                  TextColor="{StaticResource TextPrimary}"
+                  BackgroundColor="{StaticResource NavyDeepest}" />
+
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+            <Button Text="Testar" Command="{Binding TestConnectionCommand}" Style="{StaticResource PrimaryButton}" />
+            <Button Grid.Column="1" Text="Desconectar" Command="{Binding DisconnectCommand}" Style="{StaticResource SecondaryButton}" />
+          </Grid>
+        </VerticalStackLayout>
+      </Border>
+    </VerticalStackLayout>
+  </ScrollView>
+</ContentPage>

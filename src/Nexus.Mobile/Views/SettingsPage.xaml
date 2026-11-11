@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Nexus.Mobile.Views.SettingsPage"
+             Title="Configurações">
+  <ScrollView>
+    <VerticalStackLayout Padding="20" Spacing="16">
+      <Label Text="Configurações" FontSize="24" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+
+      <Border Style="{StaticResource NexusCard}">
+        <VerticalStackLayout Spacing="12">
+          <Label Text="Nome do Dispositivo" FontSize="12" TextColor="{StaticResource TextSecondary}" />
+          <Entry Text="{Binding DeviceName}" Style="{StaticResource NexusEntry}" />
+
+          <Label Text="Endpoint Padrão do Servidor" FontSize="12" TextColor="{StaticResource TextSecondary}" />
+          <Entry Text="{Binding ServerEndpoint}" Style="{StaticResource NexusEntry}" />
+
+          <HorizontalStackLayout Spacing="10">
+            <Switch IsToggled="{Binding AutoReconnect}" OnColor="{StaticResource CyanAccent}" />
+            <Label Text="Reconexão automática" VerticalOptions="Center" TextColor="{StaticResource TextPrimary}" />
+          </HorizontalStackLayout>
+
+          <HorizontalStackLayout Spacing="10">
+            <Switch IsToggled="{Binding BackgroundTelemetryEnabled}" OnColor="{StaticResource CyanAccent}" />
+            <Label Text="Telemetria de saúde local" VerticalOptions="Center" TextColor="{StaticResource TextPrimary}" />
+          </HorizontalStackLayout>
+        </VerticalStackLayout>
+      </Border>
+
+      <Button Text="Salvar" Command="{Binding SaveCommand}" Style="{StaticResource PrimaryButton}" />
+      <Button Text="Restaurar Padrões" Command="{Binding ResetCommand}" Style="{StaticResource SecondaryButton}" />
+
+      <Label Text="{Binding FeedbackMessage}" FontSize="13" TextColor="{StaticResource CyanAccent}" />
+    </VerticalStackLayout>
+  </ScrollView>
+</ContentPage>
+

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Nexus.Server</RootNamespace>
+    <AssemblyName>Nexus.Server</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Nexus.Contracts\Nexus.Contracts.csproj" />
+    <ProjectReference Include="..\Nexus.Core\Nexus.Core.csproj" />
+    <ProjectReference Include="..\Nexus.Infrastructure\Nexus.Infrastructure.csproj" />
+    <ProjectReference Include="..\Nexus.Modules\Nexus.Modules.csproj" />
+    <ProjectReference Include="..\Nexus.Security\Nexus.Security.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Serilog.AspNetCore" />
+  </ItemGroup>
+</Project>
+

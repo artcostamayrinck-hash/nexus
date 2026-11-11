@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Nexus.Mobile.Views.RealtimePage"
+             Title="Tempo Real">
+  <ScrollView>
+    <VerticalStackLayout Padding="20" Spacing="14">
+      <Label Text="Comunicação em Tempo Real" FontSize="24" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+      <Label Text="Sessão SignalR autenticada, presença real dos dispositivos, comandos com ACK e cancelamento." FontSize="13" TextColor="{StaticResource TextSecondary}" />
+
+      <Border Style="{StaticResource NexusCard}">
+        <VerticalStackLayout Spacing="6">
+          <Label Text="ESTADO SIGNALR" FontSize="11" FontAttributes="Bold" TextColor="{StaticResource TextMuted}" />
+          <Label Text="{Binding ConnectionStateText}" FontSize="22" FontAttributes="Bold" TextColor="{StaticResource CyanAccent}" />
+          <Label Text="{Binding EndpointText}" FontSize="11" TextColor="{StaticResource TextSecondary}" />
+          <Label Text="{Binding StatusText}" FontSize="12" TextColor="{StaticResource TextPrimary}" />
+          <Label Text="{Binding OnlineCount, StringFormat='{0} online'}" FontSize="12" TextColor="{StaticResource CyanAccent}" />
+          <Label Text="{Binding OfflineCount, StringFormat='{0} offline (cadastrados)'}" FontSize="12" TextColor="{StaticResource TextMuted}" />
+        </VerticalStackLayout>
+      </Border>
+
+      <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+        <Button Text="Conectar" Command="{Binding ConnectCommand}" Style="{StaticResource PrimaryButton}" />
+        <Button Grid.Column="1" Text="Desconectar" Command="{Binding DisconnectCommand}" Style="{StaticResource SecondaryButton}" />
+      </Grid>
+
+      <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+        <Button Text="Presença" Command="{Binding RefreshPresenceCommand}" Style="{StaticResource SecondaryButton}" />
+        <Button Grid.Column="1" Text="Heartbeat" Command="{Binding SendHeartbeatCommand}" Style="{StaticResource SecondaryButton}" />
+      </Grid>
+
+      <Label Text="Presença Real de Dispositivos" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+      <CollectionView ItemsSource="{Binding PresenceItems}"
+                      SelectionMode="Single"
+                      SelectedItem="{Binding SelectedPeer}"
+                      HeightRequest="170">
+        <CollectionView.ItemTemplate>
+          <DataTemplate>
+            <Border Style="{StaticResource NexusCard}" Margin="0,0,0,8">
+              <VerticalStackLayout Spacing="3">
+                <Label Text="{Binding DeviceName}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+                <Label Text="{Binding ConnectionState}" FontSize="12" TextColor="{StaticResource CyanAccent}" />
+                <Label Text="{Binding RouteSummary}" FontSize="11" TextColor="{StaticResource TextSecondary}" />
+              </VerticalStackLayout>
+            </Border>
+          </DataTemplate>
+        </CollectionView.ItemTemplate>
+      </CollectionView>
+
+      <Border Style="{StaticResource NexusCard}">
+        <VerticalStackLayout Spacing="8">
+          <Label Text="ENVIAR COMANDO / EVENTO" FontSize="11" FontAttributes="Bold" TextColor="{StaticResource TextMuted}" />
+          <Entry Text="{Binding CommandName}" Placeholder="Nome do comando" Style="{StaticResource NexusEntry}" />
+          <Entry Text="{Binding CommandPayload}" Placeholder="Argumento" Style="{StaticResource NexusEntry}" />
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+            <Button Text="Enviar Comando" Command="{Binding SendCommandCommand}" Style="{StaticResource PrimaryButton}" />
+            <Button Grid.Column="1" Text="Cancelar Último" Command="{Binding CancelLastCommandCommand}" Style="{StaticResource SecondaryButton}" />
+          </Grid>
+          <Button Text="Emitir Evento" Command="{Binding SendEventCommand}" Style="{StaticResource SecondaryButton}" />
+          <Button Text="Teste HTTP Bulk" Command="{Binding SendBulkHttpCommand}" Style="{StaticResource SecondaryButton}" />
+          <Label Text="{Binding LastAckText, StringFormat='Último ACK: {0}'}" FontSize="11" TextColor="{StaticResource CyanAccent}" />
+        </VerticalStackLayout>
+      </Border>
+    </VerticalStackLayout>
+  </ScrollView>
+</ContentPage>
+

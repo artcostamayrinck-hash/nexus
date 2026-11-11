@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Nexus.Mobile.Views.RoutesPage"
+             Title="Rotas e VPN">
+  <ScrollView>
+    <VerticalStackLayout Padding="20" Spacing="14">
+      <Label Text="Conectividade e Rotas" FontSize="24" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+      <Label Text="Prioridade automática: Wi-Fi/LAN local e fallback seguro por VPN Tailscale." FontSize="12" TextColor="{StaticResource TextSecondary}" />
+
+      <!-- Active Connection Summary Card -->
+      <Border Style="{StaticResource NexusCard}">
+        <VerticalStackLayout Spacing="6">
+          <Label Text="STATUS DA CONEXÃO ATUAL" FontSize="11" FontAttributes="Bold" TextColor="{StaticResource CyanAccent}" />
+          <Label Text="{Binding ConnectionStateText}" FontSize="22" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+          <Label Text="{Binding DeviceNameText, StringFormat='Dispositivo: {0}'}" FontSize="13" TextColor="{StaticResource TextSecondary}" />
+          <Label Text="{Binding RouteTypeText, StringFormat='Tipo de Rota: {0}'}" FontSize="13" TextColor="{StaticResource CyanAccent}" />
+          <Label Text="{Binding ActiveEndpointText, StringFormat='Endpoint: {0}'}" FontSize="12" TextColor="{StaticResource TextSecondary}" />
+          <Grid ColumnDefinitions="*,*" Margin="0,4,0,0">
+            <Label Text="{Binding LatencyText, StringFormat='Latência: {0}'}" FontSize="12" TextColor="{StaticResource SuccessGreen}" />
+            <Label Grid.Column="1" Text="{Binding LastConnectedText, StringFormat='Última: {0}'}" FontSize="11" TextColor="{StaticResource TextMuted}" HorizontalTextAlignment="End" />
+          </Grid>
+        </VerticalStackLayout>
+      </Border>
+
+      <!-- Tailscale / VPN Status Card -->
+      <Border Style="{StaticResource NexusCard}">
+        <VerticalStackLayout Spacing="6">
+          <Label Text="ESTADO DA VPN (TAILSCALE)" FontSize="11" FontAttributes="Bold" TextColor="{StaticResource CyanAccent}" />
+          <Label Text="{Binding VpnStateText}" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+          <Label Text="{Binding DiagnosticMessage}" FontSize="12" TextColor="{StaticResource TextSecondary}" />
+          <HorizontalStackLayout Spacing="10" Margin="0,4,0,0">
+            <Switch IsToggled="{Binding AutoReconnectEnabled, Mode=TwoWay}" OnColor="{StaticResource CyanAccent}" />
+            <Label Text="Reconexão automática ativa" FontSize="12" TextColor="{StaticResource TextPrimary}" VerticalTextAlignment="Center" />
+          </HorizontalStackLayout>
+        </VerticalStackLayout>
+      </Border>
+
+      <!-- Route Actions -->
+      <Button Text="Conectar Melhor Rota (LAN -> Tailscale)" Command="{Binding SelectBestRouteCommand}" Style="{StaticResource PrimaryButton}" />
+      <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+        <Button Text="Descobrir mDNS" Command="{Binding DiscoverMdnsCommand}" Style="{StaticResource SecondaryButton}" />
+        <Button Grid.Column="1" Text="Desconectar" Command="{Binding DisconnectCommand}" Style="{StaticResource SecondaryButton}" />
+      </Grid>
+
+      <!-- Add Manual / Tailscale Endpoint -->
+      <Border Style="{StaticResource NexusCard}">
+        <VerticalStackLayout Spacing="10">
+          <Label Text="CADASTRAR ENDPOINT (LAN OU TAILSCALE)" FontSize="11" FontAttributes="Bold" TextColor="{StaticResource CyanAccent}" />
+          <Entry Placeholder="Nome da rota (ex: PC Tailscale)" Text="{Binding NewEndpointLabel}" Style="{StaticResource NexusEntry}" />
+          <Entry Placeholder="https://100.x.y.z:5443 ou https://192.168.x.y:5443" Text="{Binding NewEndpointUrl}" Style="{StaticResource NexusEntry}" Keyboard="Url" />
+          <Picker Title="Tipo de Conexão" ItemsSource="{Binding AvailableRouteKinds}" SelectedItem="{Binding NewEndpointRouteKind}" TextColor="{StaticResource TextPrimary}" />
+          <Button Text="Salvar Endpoint" Command="{Binding AddEndpointCommand}" Style="{StaticResource SecondaryButton}" />
+        </VerticalStackLayout>
+      </Border>
+
+      <!-- Known Endpoints -->
+      <Label Text="ENDEREÇOS CONFIGURADOS" FontSize="11" FontAttributes="Bold" TextColor="{StaticResource TextMuted}" />
+      <CollectionView ItemsSource="{Binding Endpoints}">
+        <CollectionView.ItemTemplate>
+          <DataTemplate>
+            <Border Style="{StaticResource NexusCard}" Margin="0,0,0,10">
+              <VerticalStackLayout Spacing="4">
+                <Label Text="{Binding Label}" FontSize="15" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+                <Label Text="{Binding RouteKindText}" FontSize="12" TextColor="{StaticResource CyanAccent}" />
+                <Label Text="{Binding EndpointUrl}" FontSize="12" TextColor="{StaticResource TextSecondary}" />
+                <Label Text="{Binding StatusText}" FontSize="11" TextColor="{StaticResource TextMuted}" />
+                <Label Text="{Binding LatencyText, StringFormat='Latência: {0}'}" FontSize="11" TextColor="{StaticResource SuccessGreen}" />
+                <Button Text="Remover Endpoint"
+                        Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.RemoveEndpointCommand}"
+                        CommandParameter="{Binding EndpointId}"
+                        Style="{StaticResource SecondaryButton}"
+                        Margin="0,6,0,0" />
+              </VerticalStackLayout>
+            </Border>
+          </DataTemplate>
+        </CollectionView.ItemTemplate>
+      </CollectionView>
+    </VerticalStackLayout>
+  </ScrollView>
+</ContentPage>
+

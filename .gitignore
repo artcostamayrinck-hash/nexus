@@ -1,0 +1,48 @@
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# .NET / Visual Studio / VS Code
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.DotSettings.user
+TestResults/
+coverage*/
+*.trx
+
+# MAUI / Android
+*.apk
+*.aab
+*.keystore
+*.jks
+[Aa]ndroid/[Oo]bj/
+[Aa]ndroid/[Bb]in/
+
+# Local SQLite databases & runtime data
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+nexus-data/
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store
+

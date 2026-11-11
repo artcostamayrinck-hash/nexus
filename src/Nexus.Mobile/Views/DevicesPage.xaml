@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Nexus.Mobile.Views.DevicesPage"
+             Title="Dispositivos">
+  <ScrollView>
+    <VerticalStackLayout Padding="20" Spacing="14">
+      <Label Text="Dispositivos Confiáveis" FontSize="24" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+      <Label Text="{Binding FeedbackText}" FontSize="13" TextColor="{StaticResource CyanAccent}" />
+
+      <CollectionView ItemsSource="{Binding TrustedDeviceItems}"
+                      SelectionMode="Single"
+                      SelectedItem="{Binding SelectedTrustedItem}"
+                      HeightRequest="240">
+        <CollectionView.ItemTemplate>
+          <DataTemplate>
+            <Border Style="{StaticResource NexusCard}" Margin="0,0,0,10">
+              <VerticalStackLayout Spacing="4">
+                <Label Text="{Binding Device.CustomName}" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+                <Label Text="{Binding Device.Platform}" FontSize="12" TextColor="{StaticResource CyanAccent}" />
+                <Label Text="{Binding ConnectionBadgeText, StringFormat='Conexão: {0}'}" FontSize="12" TextColor="{StaticResource CyanAccent}" />
+                <Label Text="{Binding Device.TrustStatus, StringFormat='Confiança: {0}'}" FontSize="12" TextColor="{StaticResource TextSecondary}" />
+              </VerticalStackLayout>
+            </Border>
+          </DataTemplate>
+        </CollectionView.ItemTemplate>
+      </CollectionView>
+
+      <!-- Selected Device Details & Controls -->
+      <Border Style="{StaticResource NexusCard}">
+        <VerticalStackLayout Spacing="10">
+          <Label Text="INFORMAÇÕES DO DISPOSITIVO SELECIONADO" FontSize="11" FontAttributes="Bold" TextColor="{StaticResource TextMuted}" />
+          <Label Text="{Binding SelectedTrustBadge, StringFormat='Status: {0}'}" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource CyanAccent}" />
+          <Label Text="{Binding SelectedConnectionBadge, StringFormat='Conexão: {0}'}" FontSize="13" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+          <Label Text="{Binding SelectedLastAccessText, StringFormat='Último acesso: {0}'}" FontSize="12" TextColor="{StaticResource TextSecondary}" />
+          <Label Text="{Binding SelectedFingerprintDisplay, StringFormat='Chave ECDSA: {0}'}" FontSize="11" TextColor="{StaticResource TextMuted}" />
+
+          <Label Text="Renomear Dispositivo" FontSize="12" TextColor="{StaticResource TextSecondary}" Margin="0,4,0,0" />
+          <Entry Text="{Binding EditDeviceName}" Placeholder="Nome amigável" Style="{StaticResource NexusEntry}" />
+
+          <Button Text="Salvar Nome" Command="{Binding RenameSelectedCommand}" Style="{StaticResource SecondaryButton}" />
+
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+            <Button Text="Revogar Acesso" Command="{Binding RevokeSelectedCommand}" Style="{StaticResource SecondaryButton}" />
+            <Button Grid.Column="1" Text="Remover" Command="{Binding RemoveSelectedCommand}" Style="{StaticResource SecondaryButton}" />
+          </Grid>
+        </VerticalStackLayout>
+      </Border>
+
+      <Button Text="Atualizar Lista" Command="{Binding RefreshCommand}" Style="{StaticResource PrimaryButton}" />
+    </VerticalStackLayout>
+  </ScrollView>
+</ContentPage>
