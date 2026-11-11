@@ -149,6 +149,24 @@
           </ItemsControl>
         </StackPanel>
       </Border>
+      <!-- Quick Access Integration Modules Card -->
+      <Border Style="{StaticResource NexusElevatedCardStyle}" Margin="0,16,0,0">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+            <Button Content="Vol -" Command="{Binding QuickVolumeDownCommand}" Style="{StaticResource NexusSecondaryButtonStyle}" Margin="0,0,6,0" />
+            <Button Content="Play/Pause" Command="{Binding QuickMediaPlayPauseCommand}" Style="{StaticResource NexusSecondaryButtonStyle}" Margin="0,0,6,0" />
+            <Button Content="Vol +" Command="{Binding QuickVolumeUpCommand}" Style="{StaticResource NexusSecondaryButtonStyle}" Margin="0,0,10,0" />
+            <Button Content="Painel &amp; Automações" Command="{Binding OpenAutomationCommand}" Style="{StaticResource NexusSecondaryButtonStyle}" Margin="0,0,8,0" />
+            <Button Content="Abrir Módulos" Command="{Binding OpenModulesCommand}" Style="{StaticResource NexusPrimaryButtonStyle}" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Text="Acesso Rápido · Control · Notify · Monitor · Media" Style="{StaticResource LabelMutedStyle}" />
+            <TextBlock Text="{Binding QuickModulesBadge}" Foreground="{StaticResource CyanAccentBrush}" FontSize="15" FontWeight="Bold" Margin="0,3,0,2" />
+            <TextBlock Text="{Binding QuickHostTelemetryText}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" />
+            <TextBlock Text="{Binding QuickMediaSummaryText}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0" />
+          </StackPanel>
+        </DockPanel>
+      </Border>
     </StackPanel>
   </ScrollViewer>
 </UserControl>

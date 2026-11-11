@@ -3,12 +3,15 @@ using System.Diagnostics;
 using System.Net;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Logging;
+using Nexus.Contracts.Automation;
 using Nexus.Contracts.Commands;
 using Nexus.Contracts.Common;
 using Nexus.Contracts.Connections;
 using Nexus.Contracts.Events;
 using Nexus.Contracts.Messaging;
+using Nexus.Contracts.Modules;
 using Nexus.Contracts.Sync;
+using Nexus.Contracts.Transfers;
 using Nexus.Core.Abstractions;
 using Nexus.Core.Connections;
 using Nexus.Core.Errors;
@@ -175,6 +178,13 @@ public sealed class SignalRRealtimeClient : IRealtimeClientChannel
     public event EventHandler<IReadOnlyList<DevicePresenceSnapshot>>? PresenceUpdated;
     public event EventHandler<ClipboardEntryContract>? ClipboardReceived;
     public event EventHandler<NexusNoteContract>? NoteChangeReceived;
+    public event EventHandler<FileTransferProgressEvent>? TransferProgressReceived;
+    public event EventHandler<FileTransferRecord>? TransferAvailableReceived;
+    public event EventHandler<MobileNotificationRecord>? MobileNotificationReceived;
+    public event EventHandler<MediaPlaybackStateContract>? MediaStateReceived;
+    public event EventHandler<IntegrationModuleStatusSnapshot>? ModuleStatusChangedReceived;
+    public event EventHandler<PanelProfile>? PanelProfileUpdatedReceived;
+    public event EventHandler<AutomationExecutionRecord>? AutomationExecutionReceived;
 
     public async Task<Result> OpenAsync(string endpoint, CancellationToken cancellationToken = default)
     {
@@ -980,6 +990,62 @@ public sealed class SignalRRealtimeClient : IRealtimeClientChannel
             if (note is not null)
             {
                 NoteChangeReceived?.Invoke(this, note);
+            }
+        });
+
+        hub.On<FileTransferProgressEvent>("ReceiveTransferProgress", progress =>
+        {
+            if (progress is not null)
+            {
+                TransferProgressReceived?.Invoke(this, progress);
+            }
+        });
+
+        hub.On<FileTransferRecord>("ReceiveTransferAvailable", transfer =>
+        {
+            if (transfer is not null)
+            {
+                TransferAvailableReceived?.Invoke(this, transfer);
+            }
+        });
+
+        hub.On<MobileNotificationRecord>("ReceiveMobileNotification", notification =>
+        {
+            if (notification is not null)
+            {
+                MobileNotificationReceived?.Invoke(this, notification);
+            }
+        });
+
+        hub.On<MediaPlaybackStateContract>("ReceiveMediaState", mediaState =>
+        {
+            if (mediaState is not null)
+            {
+                MediaStateReceived?.Invoke(this, mediaState);
+            }
+        });
+
+        hub.On<IntegrationModuleStatusSnapshot>("ReceiveModuleStatusChanged", status =>
+        {
+            if (status is not null)
+            {
+                ModuleStatusChangedReceived?.Invoke(this, status);
+            }
+        });
+
+        hub.On<PanelProfile>("ReceivePanelProfileUpdated", profile =>
+        {
+            if (profile is not null)
+            {
+                PanelProfileUpdatedReceived?.Invoke(this, profile);
+            }
+        });
+
+        hub.On<AutomationExecutionRecord>("ReceiveAutomationExecution", execution =>
+        {
+            if (execution is not null)
+            {
+                AutomationExecutionReceived?.Invoke(this, execution);
             }
         });
 

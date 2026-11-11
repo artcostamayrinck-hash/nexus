@@ -1,0 +1,9 @@
+{
+  "version": "1.0.0",
+  "androidVersionCode": 10000,
+  "androidPackageId": "com.nexus.ecosystem",
+  "minAndroidApi": 26,
+  "minimumCompatibleServerVersion": "1.0.0",
+  "contractVersion": "1.0"
+}
+

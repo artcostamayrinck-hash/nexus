@@ -20,6 +20,9 @@ public static class DesktopServicesExtensions
         services.TryAddSingleton<ConnectivityViewModel>();
         services.TryAddSingleton<RealtimeViewModel>();
         services.TryAddSingleton<SyncViewModel>();
+        services.TryAddSingleton<TransferViewModel>();
+        services.TryAddSingleton<ModulesViewModel>();
+        services.TryAddSingleton<AutomationViewModel>();
         services.TryAddSingleton<PairingViewModel>();
         services.TryAddSingleton<DevicesViewModel>();
         services.TryAddSingleton<SettingsViewModel>();

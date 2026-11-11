@@ -1,0 +1,20 @@
+{
+  "Nexus": {
+    "Updates": {
+      "RepositoryOwner": "seu-usuario-ou-org",
+      "RepositoryName": "nexus-ecosystem",
+      "Visibility": "PublicDirect",
+      "IncludePrereleases": false,
+      "GitHubApiBaseUrl": "https://api.github.com",
+      "ExpectedPackageId": "com.nexus.ecosystem",
+      "ExpectedSignerSha256": "SUBSTITUIR_PELO_SHA256_DA_KEYSTORE_DE_RELEASE_64_HEX",
+      "CheckAutomatically": true,
+      "RequireUserConfirmation": true,
+      "_comments": [
+        "Modo PublicDirect: consulta GitHub Releases públicas via HTTPS sem tokens no APK.",
+        "Modo PrivateServerRelay: altere Visibility para PrivateServerRelay para que o Android consulte o Nexus.Server autenticado via TLS + NexusBearer, sem incorporar PAT no APK."
+      ]
+    }
+  }
+}
+

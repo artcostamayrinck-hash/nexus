@@ -15,7 +15,13 @@ public enum NexusPermission
     RemoteCommands = 1 << 4,
     ManageDevices = 1 << 5,
     Notes = 1 << 6,
+    ControlInput = 1 << 7,
+    SystemPower = 1 << 8,
+    HardwareMonitor = 1 << 9,
+    MediaControl = 1 << 10,
+    Automation = 1 << 11,
     All = ViewStatus | Notifications | Clipboard | FileTransfer | RemoteCommands | ManageDevices | Notes
+        | ControlInput | SystemPower | HardwareMonitor | MediaControl | Automation
 }
 
 public enum DeviceTrustStatus

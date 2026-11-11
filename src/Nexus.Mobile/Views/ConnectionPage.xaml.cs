@@ -25,8 +25,12 @@ public partial class ConnectionPage : ContentPage
             var text = await Clipboard.Default.GetTextAsync();
             if (!string.IsNullOrWhiteSpace(text))
             {
-                _viewModel.QrInputText = text;
+                _viewModel.QrInputText = text.Trim();
+                _viewModel.SetPairingFeedback("Payload do QR Code colado da área de transferência. Toque em \"Parear Agora\".");
+                return;
             }
         }
+
+        _viewModel.SetPairingFeedback("Área de transferência vazia. Copie o JSON do QR Code exibido no NEXUS Windows.");
     }
 }

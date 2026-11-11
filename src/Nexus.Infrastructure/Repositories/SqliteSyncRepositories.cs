@@ -228,47 +228,32 @@ public sealed class SqliteNotesRepository : INotesRepository
         }, cancellationToken);
     }
 
-    public Task<Result<IReadOnlyList<NexusNoteContract>>> SearchAsync(
+    public async Task<Result<IReadOnlyList<NexusNoteContract>>> SearchAsync(
         string query,
         bool includeDeleted = false,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(query))
         {
-            return ListAsync(includeDeleted, cancellationToken);
+            return await ListAsync(includeDeleted, cancellationToken).ConfigureAwait(false);
         }
 
         var trimmed = query.Trim();
-        return _failureHandler.ExecuteAsync<IReadOnlyList<NexusNoteContract>>("Notes.Search", async ct =>
+        var listed = await ListAsync(includeDeleted, cancellationToken).ConfigureAwait(false);
+        if (listed.IsFailure)
         {
-            await using var conn = await _connectionFactory.OpenConnectionAsync(ct).ConfigureAwait(false);
-            await using var cmd = conn.CreateCommand();
-            cmd.CommandText = includeDeleted
-                ? """
-                  SELECT NoteId, Title, Body, Version, BaseVersion, ContentHash, LastModifiedByDeviceId, LastModifiedByDeviceName,
-                         CreatedAtUtc, ModifiedAtUtc, IsDeleted, DeletedAtUtc, HasConflict, NeedsSync, ContractVersion
-                  FROM Notes
-                  WHERE INSTR(LOWER(Title), LOWER($q)) > 0 OR INSTR(LOWER(Body), LOWER($q)) > 0
-                  ORDER BY ModifiedAtUtc DESC;
-                  """
-                : """
-                  SELECT NoteId, Title, Body, Version, BaseVersion, ContentHash, LastModifiedByDeviceId, LastModifiedByDeviceName,
-                         CreatedAtUtc, ModifiedAtUtc, IsDeleted, DeletedAtUtc, HasConflict, NeedsSync, ContractVersion
-                  FROM Notes
-                  WHERE IsDeleted = 0 AND (INSTR(LOWER(Title), LOWER($q)) > 0 OR INSTR(LOWER(Body), LOWER($q)) > 0)
-                  ORDER BY ModifiedAtUtc DESC;
-                  """;
-            cmd.Parameters.AddWithValue("$q", trimmed);
+            return listed;
+        }
 
-            var notes = new List<NexusNoteContract>();
-            await using var reader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
-            while (await reader.ReadAsync(ct).ConfigureAwait(false))
-            {
-                notes.Add(MapNote(reader));
-            }
+        // SQLite's built-in LOWER() is ASCII-only; compare in .NET to handle Unicode and accents accurately.
+        var compare = CultureInfo.InvariantCulture.CompareInfo;
+        const CompareOptions opts = CompareOptions.IgnoreCase | CompareOptions.IgnoreNonSpace;
+        var filtered = listed.Value
+            .Where(n => compare.IndexOf(n.Title, trimmed, opts) >= 0 ||
+                        compare.IndexOf(n.Body, trimmed, opts) >= 0)
+            .ToArray();
 
-            return notes;
-        }, cancellationToken);
+        return Result<IReadOnlyList<NexusNoteContract>>.Success(filtered);
     }
 
     public Task<Result<NexusNoteContract>> UpsertNoteAsync(NexusNoteContract note, CancellationToken cancellationToken = default)

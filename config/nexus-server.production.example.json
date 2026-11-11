@@ -1,0 +1,42 @@
+{
+  "Urls": "https://0.0.0.0:5443",
+  "Nexus": {
+    "Storage": {
+      "RootDirectory": "%LOCALAPPDATA%\\NEXUS\\server",
+      "DatabaseFileName": "nexus-server.db"
+    },
+    "Tls": {
+      "BindKestrelHttps": true,
+      "HttpPort": 5280,
+      "HttpsPort": 5443,
+      "RequireHttps": true
+    },
+    "Security": {
+      "EnableLocalHostBridge": true
+    },
+    "Discovery": {
+      "EnableMdns": true
+    },
+    "Updates": {
+      "RepositoryOwner": "seu-usuario-ou-org",
+      "RepositoryName": "nexus-ecosystem",
+      "GitHubApiBaseUrl": "https://api.github.com",
+      "TokenEnvironmentVariable": "NEXUS_GITHUB_RELEASE_TOKEN",
+      "IncludePrereleases": false,
+      "ExpectedPackageId": "com.nexus.ecosystem",
+      "ExpectedSignerSha256": "SUBSTITUIR_PELO_SHA256_DA_KEYSTORE_DE_RELEASE_64_HEX",
+      "MinimumCompatibleServerVersion": "1.0.0",
+      "MetadataCacheSeconds": 120
+    }
+  },
+  "Serilog": {
+    "MinimumLevel": {
+      "Default": "Information",
+      "Override": {
+        "Microsoft.AspNetCore": "Warning"
+      }
+    }
+  },
+  "AllowedHosts": "*"
+}
+

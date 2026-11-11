@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="456" height="456" viewBox="0 0 456 456" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="nexusBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0B1220" />
+      <stop offset="100%" stop-color="#13223D" />
+    </linearGradient>
+  </defs>
+  <rect width="456" height="456" fill="url(#nexusBg)" />
+</svg>
+

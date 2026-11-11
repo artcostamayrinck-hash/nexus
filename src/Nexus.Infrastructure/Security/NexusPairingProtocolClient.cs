@@ -14,7 +14,7 @@ namespace Nexus.Infrastructure.Security;
 /// <summary>
 /// Shared cryptographic request builders and TLS-pinned HTTP transport helpers used by Desktop and Mobile pairing clients.
 /// </summary>
-public sealed class NexusPairingProtocolClient
+public sealed class NexusPairingProtocolClient : IDisposable
 {
     private readonly ICryptographicIdentityProvider _identityProvider;
     private readonly ITokenGenerator _tokenGenerator;
@@ -45,19 +45,76 @@ public sealed class NexusPairingProtocolClient
         _customHttpClientFactory = customHttpClientFactory;
     }
 
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, SocketsHttpHandler> _handlerPool = new(StringComparer.Ordinal);
+    private volatile bool _disposed;
+
     public HttpClient CreateHttpClient(string baseEndpoint, string? expectedTlsThumbprint, TimeSpan? timeout = null)
+        => CreateHttpClient(baseEndpoint, expectedTlsThumbprint, timeout, handlerOverride: null);
+
+    public HttpClient CreateHttpClient(
+        string baseEndpoint,
+        string? expectedTlsThumbprint,
+        TimeSpan? timeout,
+        Func<string, string?, HttpMessageHandler>? handlerOverride)
     {
+        var baseAddress = new Uri(baseEndpoint.Trim().TrimEnd('/') + "/", UriKind.Absolute);
+
+        if (handlerOverride is not null)
+        {
+            var customHandler = handlerOverride(baseEndpoint, expectedTlsThumbprint);
+            return new HttpClient(customHandler, disposeHandler: true)
+            {
+                BaseAddress = baseAddress,
+                Timeout = timeout ?? TimeSpan.FromSeconds(15)
+            };
+        }
+
         if (_customHttpClientFactory is not null)
         {
             return _customHttpClientFactory(baseEndpoint, expectedTlsThumbprint);
         }
 
-        var handler = LocalTlsCertificateManager.CreatePinnedTlsHandler(expectedTlsThumbprint);
-        return new HttpClient(handler, disposeHandler: true)
+        var normalizedKey = string.IsNullOrWhiteSpace(expectedTlsThumbprint)
+            ? string.Empty
+            : expectedTlsThumbprint.Replace(":", string.Empty, StringComparison.Ordinal).Trim().ToUpperInvariant();
+        var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(5);
+
+        if (_disposed)
         {
-            BaseAddress = new Uri(baseEndpoint.Trim().TrimEnd('/') + "/", UriKind.Absolute),
-            Timeout = timeout ?? TimeSpan.FromSeconds(5)
+            var fallbackHandler = LocalTlsCertificateManager.CreatePinnedSocketsHandler(expectedTlsThumbprint);
+            return new HttpClient(fallbackHandler, disposeHandler: true)
+            {
+                BaseAddress = baseAddress,
+                Timeout = effectiveTimeout
+            };
+        }
+
+        var pooledHandler = _handlerPool.GetOrAdd(
+            normalizedKey,
+            static key => LocalTlsCertificateManager.CreatePinnedSocketsHandler(string.IsNullOrEmpty(key) ? null : key));
+
+        return new HttpClient(pooledHandler, disposeHandler: false)
+        {
+            BaseAddress = baseAddress,
+            Timeout = effectiveTimeout
         };
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        foreach (var pair in _handlerPool)
+        {
+            if (_handlerPool.TryRemove(pair.Key, out var handler))
+            {
+                handler.Dispose();
+            }
+        }
     }
 
     public async Task<Result<CreatePairingRequest>> BuildCreatePairingRequestAsync(

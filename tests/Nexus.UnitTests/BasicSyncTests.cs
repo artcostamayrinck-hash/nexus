@@ -542,6 +542,13 @@ public sealed class BasicSyncTests : IDisposable
         public event EventHandler<IReadOnlyList<DevicePresenceSnapshot>>? PresenceUpdated;
         public event EventHandler<ClipboardEntryContract>? ClipboardReceived;
         public event EventHandler<NexusNoteContract>? NoteChangeReceived;
+        public event EventHandler<Nexus.Contracts.Transfers.FileTransferProgressEvent>? TransferProgressReceived;
+        public event EventHandler<Nexus.Contracts.Transfers.FileTransferRecord>? TransferAvailableReceived;
+        public event EventHandler<Nexus.Contracts.Modules.MobileNotificationRecord>? MobileNotificationReceived;
+        public event EventHandler<Nexus.Contracts.Modules.MediaPlaybackStateContract>? MediaStateReceived;
+        public event EventHandler<Nexus.Contracts.Modules.IntegrationModuleStatusSnapshot>? ModuleStatusChangedReceived;
+        public event EventHandler<Nexus.Contracts.Automation.PanelProfile>? PanelProfileUpdatedReceived;
+        public event EventHandler<Nexus.Contracts.Automation.AutomationExecutionRecord>? AutomationExecutionReceived;
 #pragma warning restore CS0067
 
         public Task<Result> OpenAsync(string endpoint, CancellationToken cancellationToken = default) => Task.FromResult(Result.Success());

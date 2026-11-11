@@ -18,6 +18,14 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (DataContext is Nexus.Desktop.Services.ViewModels.MainShellViewModel vm &&
+            !vm.Settings.EnableSubtleAnimations)
+        {
+            ContentHost.BeginAnimation(OpacityProperty, null);
+            ContentHost.Opacity = 1.0;
+            return;
+        }
+
         var fadeIn = new DoubleAnimation(0.35, 1.0, TimeSpan.FromMilliseconds(180))
         {
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }

@@ -7,15 +7,22 @@
        Shell.TabBarForegroundColor="{StaticResource CyanAccent}"
        Shell.TabBarTitleColor="{StaticResource CyanAccent}"
        Shell.TabBarUnselectedColor="{StaticResource TextMuted}"
+       FlyoutBehavior="Flyout"
+       FlyoutBackgroundColor="{StaticResource NavyDeepest}"
        BackgroundColor="{StaticResource NavyBase}">
-  <TabBar>
+  <FlyoutItem Title="Principal" FlyoutDisplayOptions="AsSingleItem">
     <ShellContent Title="Início" Route="home" ContentTemplate="{DataTemplate views:HomePage}" />
+    <ShellContent Title="Painel" Route="panel" ContentTemplate="{DataTemplate views:PanelPage}" />
+    <ShellContent Title="Módulos" Route="modules" ContentTemplate="{DataTemplate views:ModulesPage}" />
+    <ShellContent Title="Transferir" Route="transfers" ContentTemplate="{DataTemplate views:TransferPage}" />
     <ShellContent Title="Conexão" Route="connection" ContentTemplate="{DataTemplate views:ConnectionPage}" />
-    <ShellContent Title="Rotas" Route="routes" ContentTemplate="{DataTemplate views:RoutesPage}" />
-    <ShellContent Title="Tempo Real" Route="realtime" ContentTemplate="{DataTemplate views:RealtimePage}" />
-    <ShellContent Title="Sincronizar" Route="sync" ContentTemplate="{DataTemplate views:SyncPage}" />
-    <ShellContent Title="Dispositivos" Route="devices" ContentTemplate="{DataTemplate views:DevicesPage}" />
-    <ShellContent Title="Ajustes" Route="settings" ContentTemplate="{DataTemplate views:SettingsPage}" />
-  </TabBar>
+  </FlyoutItem>
+  <ShellContent Title="Rotas" Route="routes" ContentTemplate="{DataTemplate views:RoutesPage}" />
+  <ShellContent Title="Tempo Real" Route="realtime" ContentTemplate="{DataTemplate views:RealtimePage}" />
+  <ShellContent Title="Sincronizar" Route="sync" ContentTemplate="{DataTemplate views:SyncPage}" />
+  <ShellContent Title="Automações" Route="automate" ContentTemplate="{DataTemplate views:AutomatePage}" />
+  <ShellContent Title="Atualizações" Route="updates" ContentTemplate="{DataTemplate views:UpdatePage}" />
+  <ShellContent Title="Dispositivos" Route="devices" ContentTemplate="{DataTemplate views:DevicesPage}" />
+  <ShellContent Title="Ajustes" Route="settings" ContentTemplate="{DataTemplate views:SettingsPage}" />
 </Shell>
 

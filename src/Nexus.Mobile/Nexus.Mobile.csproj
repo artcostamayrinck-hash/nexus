@@ -7,9 +7,23 @@
     <SingleProject>true</SingleProject>
     <ApplicationTitle>NEXUS</ApplicationTitle>
     <ApplicationId>com.nexus.ecosystem</ApplicationId>
-    <ApplicationDisplayVersion>0.2.0</ApplicationDisplayVersion>
-    <ApplicationVersion>2</ApplicationVersion>
+    <ApplicationDisplayVersion>$(NexusVersion)</ApplicationDisplayVersion>
+    <ApplicationVersion>$(NexusAndroidVersionCode)</ApplicationVersion>
     <SupportedOSPlatformVersion>26.0</SupportedOSPlatformVersion>
+  </PropertyGroup>
+
+  <!-- Release APK packaging & external secret-based signing (keystore NEVER stored in repository) -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <AndroidPackageFormat>apk</AndroidPackageFormat>
+    <AndroidUseAapt2>true</AndroidUseAapt2>
+    <AndroidCreatePackagePerAbi>false</AndroidCreatePackagePerAbi>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release' And '$(AndroidKeyStore)' == 'true'">
+    <AndroidSigningKeyStore>$(AndroidSigningKeyStore)</AndroidSigningKeyStore>
+    <AndroidSigningKeyAlias>$(AndroidSigningKeyAlias)</AndroidSigningKeyAlias>
+    <AndroidSigningKeyPass>$(AndroidSigningKeyPass)</AndroidSigningKeyPass>
+    <AndroidSigningStorePass>$(AndroidSigningStorePass)</AndroidSigningStorePass>
   </PropertyGroup>
 
   <ItemGroup>
@@ -22,7 +36,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#0B1220" />
+    <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#0B1220" BaseSize="128,128" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Microsoft.Maui.Controls" />
   </ItemGroup>
 </Project>
-

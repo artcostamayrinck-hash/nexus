@@ -76,8 +76,23 @@ public sealed class DefaultLocalDeviceContext : ILocalDeviceContext
         OperatingSystemVersion = string.IsNullOrWhiteSpace(operatingSystemVersion)
             ? Environment.OSVersion.VersionString
             : operatingSystemVersion;
-        AppVersion = string.IsNullOrWhiteSpace(appVersion) ? "0.2.0" : appVersion;
+        AppVersion = string.IsNullOrWhiteSpace(appVersion) ? ResolveDefaultVersion() : appVersion;
         Capabilities = capabilities;
+    }
+
+    private static string ResolveDefaultVersion()
+    {
+        var info = typeof(DefaultLocalDeviceContext).Assembly
+            .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+            .OfType<System.Reflection.AssemblyInformationalVersionAttribute>()
+            .FirstOrDefault()?.InformationalVersion;
+        if (!string.IsNullOrWhiteSpace(info))
+        {
+            var plusIdx = info.IndexOf('+');
+            return plusIdx > 0 ? info[..plusIdx] : info;
+        }
+
+        return typeof(DefaultLocalDeviceContext).Assembly.GetName().Version?.ToString(3) ?? "1.0.0";
     }
 
     public Guid DeviceId { get; }

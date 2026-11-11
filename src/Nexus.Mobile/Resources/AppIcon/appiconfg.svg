@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="456" height="456" viewBox="0 0 456 456" xmlns="http://www.w3.org/2000/svg">
+  <polygon points="228,74 360,151 360,305 228,382 96,305 96,151"
+           fill="none" stroke="#22D3EE" stroke-width="18" stroke-linejoin="round" />
+  <path d="M164,300 L164,156 L292,300 L292,156"
+        fill="none" stroke="#F8FAFC" stroke-width="26" stroke-linecap="round" stroke-linejoin="round" />
+  <circle cx="164" cy="156" r="16" fill="#22D3EE" />
+  <circle cx="292" cy="300" r="16" fill="#22D3EE" />
+</svg>
+

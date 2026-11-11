@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Nexus.Mobile.Views.UpdatePage"
+             Title="Atualizações">
+  <ScrollView>
+    <VerticalStackLayout Padding="20" Spacing="16">
+      <Label Text="NEXUS Update" FontSize="26" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+      <Label Text="Distribuição verificada via GitHub Releases, integridade SHA-256 e assinatura Android consistente."
+             FontSize="12"
+             TextColor="{StaticResource CyanAccent}" />
+
+      <!-- Installed Package Card -->
+      <Border Style="{StaticResource NexusCard}">
+        <VerticalStackLayout Spacing="6">
+          <Label Text="VERSÃO INSTALADA" FontSize="11" FontAttributes="Bold" TextColor="{StaticResource CyanAccent}" />
+          <Label Text="{Binding InstalledVersionText}" FontSize="20" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+          <Label Text="{Binding InstalledPackageId, StringFormat='Pacote: {0}'}" FontSize="12" TextColor="{StaticResource TextSecondary}" />
+          <Label Text="{Binding InstalledSignerText, StringFormat='Assinatura SHA-256: {0}'}" FontSize="11" TextColor="{StaticResource CyanAccent}" />
+          <Label Text="{Binding PermissionBadge}" FontSize="12" TextColor="{StaticResource WarningAmber}" />
+          <Button Text="Configurar 'Fontes Desconhecidas' no Android"
+                  Command="{Binding OpenUnknownSourcesCommand}"
+                  IsVisible="{Binding RequiresPermissionPrompt}"
+                  Style="{StaticResource SecondaryButton}"
+                  Margin="0,6,0,0" />
+        </VerticalStackLayout>
+      </Border>
+
+      <!-- Repository Configuration Card (Zero PAT in APK) -->
+      <Border Style="{StaticResource NexusCard}">
+        <VerticalStackLayout Spacing="10">
+          <Label Text="FONTE GITHUB (HTTPS)" FontSize="11" FontAttributes="Bold" TextColor="{StaticResource CyanAccent}" />
+          <Label Text="Nota de segurança: repositórios privados utilizam o relay autenticado no Nexus.Server pareado — nenhum token do GitHub é gravado no APK."
+                 FontSize="11"
+                 TextColor="{StaticResource TextSecondary}" />
+
+          <Label Text="Proprietário / Organização" FontSize="12" TextColor="{StaticResource TextMuted}" />
+          <Entry Text="{Binding RepositoryOwner}" Style="{StaticResource NexusEntry}" />
+
+          <Label Text="Repositório" FontSize="12" TextColor="{StaticResource TextMuted}" />
+          <Entry Text="{Binding RepositoryName}" Style="{StaticResource NexusEntry}" />
+
+          <Label Text="Visibilidade" FontSize="12" TextColor="{StaticResource TextMuted}" />
+          <Picker ItemsSource="{Binding VisibilityModes}" SelectedItem="{Binding SelectedVisibility}" TextColor="{StaticResource TextPrimary}" />
+
+          <Label Text="Assinatura SHA-256 esperada (opcional em 1ª instalação)" FontSize="12" TextColor="{StaticResource TextMuted}" />
+          <Entry Text="{Binding ExpectedSignerSha256}" Placeholder="64 caracteres hex" Style="{StaticResource NexusEntry}" />
+
+          <HorizontalStackLayout Spacing="10">
+            <Switch IsToggled="{Binding IncludePrereleases}" OnColor="{StaticResource CyanAccent}" />
+            <Label Text="Incluir Pre-releases (beta/rc)" VerticalOptions="Center" TextColor="{StaticResource TextPrimary}" />
+          </HorizontalStackLayout>
+
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+            <Button Text="Salvar Origem" Command="{Binding SaveConfigurationCommand}" Style="{StaticResource SecondaryButton}" />
+            <Button Grid.Column="1" Text="Verificar Atualização" Command="{Binding CheckUpdatesCommand}" Style="{StaticResource PrimaryButton}" />
+          </Grid>
+        </VerticalStackLayout>
+      </Border>
+
+      <!-- Release Availability & Download Card -->
+      <Border Style="{StaticResource NexusCard}">
+        <VerticalStackLayout Spacing="8">
+          <Label Text="{Binding AvailabilityBadge}" FontSize="11" FontAttributes="Bold" TextColor="{StaticResource SuccessGreen}" />
+          <Label Text="{Binding AvailabilityTitle}" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+          <Label Text="{Binding CompatibilitySummary}" FontSize="12" TextColor="{StaticResource CyanAccent}" />
+          <Label Text="{Binding ReleaseNotesText}" FontSize="12" TextColor="{StaticResource TextSecondary}" />
+
+          <ProgressBar Progress="{Binding DownloadProgressFraction}" ProgressColor="{StaticResource CyanAccent}" />
+          <Label Text="{Binding DownloadStatusText}" FontSize="11" TextColor="{StaticResource TextSecondary}" />
+          <Label Text="{Binding VerificationBadgesText}" FontSize="11" TextColor="{StaticResource SuccessGreen}" />
+
+          <Button Text="Baixar e Validar APK (HTTPS + SHA-256 + Assinatura)"
+                  Command="{Binding DownloadUpdateCommand}"
+                  Style="{StaticResource PrimaryButton}" />
+        </VerticalStackLayout>
+      </Border>
+
+      <!-- Explicit User Confirmation Install Card -->
+      <Border Style="{StaticResource NexusCard}" IsVisible="{Binding HasVerifiedPackage}">
+        <VerticalStackLayout Spacing="10">
+          <Label Text="CONFIRMAÇÃO EXPLÍCITA DO USUÁRIO" FontSize="11" FontAttributes="Bold" TextColor="{StaticResource WarningAmber}" />
+          <HorizontalStackLayout Spacing="10">
+            <CheckBox IsChecked="{Binding UserConfirmedInstall}" Color="{StaticResource CyanAccent}" />
+            <Label Text="Confirmo que desejo iniciar a instalação manual desta atualização verificada no Android."
+                   VerticalOptions="Center"
+                   TextColor="{StaticResource TextPrimary}" />
+          </HorizontalStackLayout>
+          <Button Text="Abrir Instalador do Android"
+                  Command="{Binding InstallUpdateCommand}"
+                  Style="{StaticResource PrimaryButton}" />
+        </VerticalStackLayout>
+      </Border>
+
+      <Label Text="{Binding FeedbackMessage}" FontSize="13" TextColor="{StaticResource CyanAccent}" />
+    </VerticalStackLayout>
+  </ScrollView>
+</ContentPage>
+

@@ -1,0 +1,301 @@
+<UserControl x:Class="Nexus.Desktop.Views.TransferView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <StackPanel>
+      <DockPanel Margin="0,0,0,18">
+        <StackPanel DockPanel.Dock="Left">
+          <TextBlock Text="NEXUS Transfer (Envio e Recebimento Seguro)" Style="{StaticResource PageTitleStyle}" />
+          <TextBlock Text="Transferência bidirecional via HTTP Streaming com retomada de chunks, verificação SHA-256 e sem execução automática."
+                     Style="{StaticResource PageSubtitleStyle}"
+                     Margin="0,4,0,0" />
+        </StackPanel>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+          <Button Content="Sincronizar Recebidos"
+                  Command="{Binding SyncIncomingCommand}"
+                  Style="{StaticResource NexusSecondaryButtonStyle}"
+                  Margin="0,0,8,0" />
+          <Button Content="Retomar Interrompidas"
+                  Command="{Binding ResumeInterruptedCommand}"
+                  Style="{StaticResource NexusSecondaryButtonStyle}"
+                  Margin="0,0,8,0" />
+          <Button Content="Atualizar"
+                  Command="{Binding RefreshCommand}"
+                  Style="{StaticResource NexusPrimaryButtonStyle}" />
+        </StackPanel>
+      </DockPanel>
+
+      <!-- KPI Strip -->
+      <UniformGrid Columns="4" Margin="0,0,0,14">
+        <Border Style="{StaticResource NexusCardStyle}" Margin="0,0,12,12">
+          <StackPanel>
+            <TextBlock Text="FILA &amp; EM ANDAMENTO" Style="{StaticResource LabelMutedStyle}" />
+            <TextBlock Text="{Binding ActiveCountText}" Foreground="{StaticResource CyanAccentBrush}" FontSize="19" FontWeight="Bold" Margin="0,6,0,2" />
+            <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </Border>
+        <Border Style="{StaticResource NexusCardStyle}" Margin="0,0,12,12">
+          <StackPanel>
+            <TextBlock Text="ARQUIVOS RECEBIDOS" Style="{StaticResource LabelMutedStyle}" />
+            <TextBlock Text="{Binding ReceivedCountText}" Foreground="{StaticResource SuccessBrush}" FontSize="19" FontWeight="Bold" Margin="0,6,0,2" />
+            <TextBlock Text="Verificados por SHA-256" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" />
+          </StackPanel>
+        </Border>
+        <Border Style="{StaticResource NexusCardStyle}" Margin="0,0,12,12">
+          <StackPanel>
+            <TextBlock Text="HISTÓRICO" Style="{StaticResource LabelMutedStyle}" />
+            <TextBlock Text="{Binding HistoryCountText}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="19" FontWeight="Bold" Margin="0,6,0,2" />
+            <TextBlock Text="Persistência local em SQLite" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" />
+          </StackPanel>
+        </Border>
+        <Border Style="{StaticResource NexusCardStyle}" Margin="0,0,0,12">
+          <StackPanel>
+            <TextBlock Text="PASTA SEGURA" Style="{StaticResource LabelMutedStyle}" />
+            <TextBlock Text="Execução Automática Bloqueada" Foreground="{StaticResource WarningBrush}" FontSize="13" FontWeight="Bold" Margin="0,6,0,2" />
+            <TextBlock Text="{Binding ReceivedFolderPath}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </Border>
+      </UniformGrid>
+
+      <!-- Send Files & Queue Configuration Card -->
+      <Border Style="{StaticResource NexusCardStyle}" Margin="0,0,0,16">
+        <StackPanel>
+          <DockPanel Margin="0,0,0,12">
+            <TextBlock Text="Enviar Arquivos &amp; Políticas da Fila" Style="{StaticResource CardHeaderStyle}" DockPanel.Dock="Left" />
+            <Button Content="Salvar Configuração"
+                    Command="{Binding ApplyQueueConfigCommand}"
+                    Style="{StaticResource NexusSecondaryButtonStyle}"
+                    DockPanel.Dock="Right" />
+          </DockPanel>
+
+          <WrapPanel Orientation="Horizontal" Margin="0,0,0,12">
+            <StackPanel Width="240" Margin="0,0,16,8">
+              <TextBlock Text="Dispositivo Destino Autorizado" Style="{StaticResource LabelMutedStyle}" Margin="0,0,0,4" />
+              <ComboBox ItemsSource="{Binding AuthorizedPeers}"
+                        SelectedItem="{Binding SelectedPeer}"
+                        DisplayMemberPath="CustomName" />
+            </StackPanel>
+
+            <StackPanel Width="170" Margin="0,0,16,8">
+              <TextBlock Text="Arquivos Duplicados" Style="{StaticResource LabelMutedStyle}" Margin="0,0,0,4" />
+              <ComboBox ItemsSource="{Binding DuplicatePolicies}"
+                        SelectedItem="{Binding SelectedDuplicatePolicy}" />
+            </StackPanel>
+
+            <StackPanel Width="130" Margin="0,0,16,8">
+              <TextBlock Text="Máx. Simultâneas (1-8)" Style="{StaticResource LabelMutedStyle}" Margin="0,0,0,4" />
+              <TextBox Text="{Binding MaxConcurrentTransfers, UpdateSourceTrigger=PropertyChanged}"
+                       Style="{StaticResource NexusTextBoxStyle}" />
+            </StackPanel>
+
+            <StackPanel VerticalAlignment="Bottom" Margin="0,0,16,10">
+              <CheckBox Content="Baixar recebidos automaticamente"
+                        IsChecked="{Binding AutoDownloadIncoming}"
+                        Foreground="{StaticResource TextPrimaryBrush}"
+                        Margin="0,0,0,4" />
+              <CheckBox Content="Retomar ao reconectar"
+                        IsChecked="{Binding AutoResumeOnReconnect}"
+                        Foreground="{StaticResource TextSecondaryBrush}" />
+            </StackPanel>
+          </WrapPanel>
+
+          <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+            <Button Content="Selecionar Múltiplos Arquivos..."
+                    Click="OnBrowseFilesClicked"
+                    Style="{StaticResource NexusSecondaryButtonStyle}"
+                    Margin="0,0,10,0" />
+            <Button Content="Enviar Selecionados"
+                    Command="{Binding SendSelectedFilesCommand}"
+                    Style="{StaticResource NexusPrimaryButtonStyle}"
+                    Margin="0,0,10,0" />
+            <Button Content="Limpar Seleção"
+                    Command="{Binding ClearPendingFilesCommand}"
+                    Style="{StaticResource NexusSecondaryButtonStyle}" />
+          </StackPanel>
+
+          <ItemsControl ItemsSource="{Binding PendingSelectedFiles}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Background="{StaticResource NavyElevatedBrush}"
+                        BorderBrush="{StaticResource NavyBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="10,6"
+                        Margin="0,0,0,6">
+                  <DockPanel>
+                    <Button DockPanel.Dock="Right"
+                            Content="Remover"
+                            Command="{Binding DataContext.RemovePendingFileCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            CommandParameter="{Binding}"
+                            Style="{StaticResource NexusSecondaryButtonStyle}"
+                            Padding="8,3" />
+                    <TextBlock Text="{Binding}"
+                               Foreground="{StaticResource TextPrimaryBrush}"
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis" />
+                  </DockPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+
+      <!-- Active Transfers Card -->
+      <Border Style="{StaticResource NexusCardStyle}" Margin="0,0,0,16">
+        <StackPanel>
+          <TextBlock Text="Transferências em Andamento &amp; Pausadas" Style="{StaticResource CardHeaderStyle}" Margin="0,0,0,10" />
+          <ItemsControl ItemsSource="{Binding ActiveTransfers}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Background="{StaticResource NavyElevatedBrush}"
+                        BorderBrush="{StaticResource NavyBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="10"
+                        Padding="12"
+                        Margin="0,0,0,8">
+                  <Grid>
+                    <Grid.RowDefinitions>
+                      <RowDefinition Height="Auto" />
+                      <RowDefinition Height="Auto" />
+                      <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Row="0" Grid.Column="0">
+                      <TextBlock Text="{Binding FileName}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="14" FontWeight="SemiBold" />
+                      <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="11">
+                        <Run Text="{Binding DirectionDisplay}" />
+                        <Run Text=" · Peer: " />
+                        <Run Text="{Binding PeerDeviceName}" />
+                        <Run Text=" · " />
+                        <Run Text="{Binding StageDisplay}" />
+                      </TextBlock>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                      <Button Content="Pausar"
+                              Command="{Binding DataContext.PauseTransferCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                              CommandParameter="{Binding}"
+                              IsEnabled="{Binding CanPause}"
+                              Style="{StaticResource NexusSecondaryButtonStyle}"
+                              Margin="0,0,6,0" />
+                      <Button Content="Retomar"
+                              Command="{Binding DataContext.ResumeTransferCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                              CommandParameter="{Binding}"
+                              IsEnabled="{Binding CanResume}"
+                              Style="{StaticResource NexusPrimaryButtonStyle}"
+                              Margin="0,0,6,0" />
+                      <Button Content="Cancelar"
+                              Command="{Binding DataContext.CancelTransferCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                              CommandParameter="{Binding}"
+                              IsEnabled="{Binding CanCancel}"
+                              Style="{StaticResource NexusDangerButtonStyle}" />
+                    </StackPanel>
+
+                    <ProgressBar Grid.Row="1"
+                                 Grid.Column="0"
+                                 Grid.ColumnSpan="2"
+                                 Value="{Binding PercentComplete, Mode=OneWay}"
+                                 Maximum="100"
+                                 Height="8"
+                                 Margin="0,8,0,6" />
+
+                    <TextBlock Grid.Row="2"
+                               Grid.Column="0"
+                               Grid.ColumnSpan="2"
+                               Text="{Binding ProgressSummary}"
+                               Foreground="{StaticResource CyanAccentBrush}"
+                               FontSize="12" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+
+      <!-- Received Files & History Grid -->
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="16" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0" Style="{StaticResource NexusCardStyle}">
+          <StackPanel>
+            <TextBlock Text="Arquivos Recebidos (Somente Leitura)" Style="{StaticResource CardHeaderStyle}" Margin="0,0,0,10" />
+            <ItemsControl ItemsSource="{Binding ReceivedFiles}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Border Background="{StaticResource NavyElevatedBrush}"
+                          BorderBrush="{StaticResource NavyBorderBrush}"
+                          BorderThickness="1"
+                          CornerRadius="8"
+                          Padding="10"
+                          Margin="0,0,0,6">
+                    <StackPanel>
+                      <TextBlock Text="{Binding FileName}" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" />
+                      <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="11">
+                        <Run Text="{Binding SizeDisplay}" />
+                        <Run Text=" · Origem: " />
+                        <Run Text="{Binding PeerDeviceName}" />
+                        <Run Text=" · SHA: " />
+                        <Run Text="{Binding ChecksumShort}" />
+                      </TextBlock>
+                      <TextBlock Text="{Binding LocalFilePath}" Foreground="{StaticResource TextMutedBrush}" FontSize="10" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+
+        <Border Grid.Column="2" Style="{StaticResource NexusCardStyle}">
+          <StackPanel>
+            <DockPanel Margin="0,0,0,10">
+              <TextBlock Text="Histórico Completo" Style="{StaticResource CardHeaderStyle}" DockPanel.Dock="Left" />
+              <Button Content="Limpar Histórico"
+                      Command="{Binding ClearHistoryCommand}"
+                      Style="{StaticResource NexusSecondaryButtonStyle}"
+                      DockPanel.Dock="Right" />
+            </DockPanel>
+            <ItemsControl ItemsSource="{Binding HistoryItems}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Border Background="{StaticResource NavyElevatedBrush}"
+                          BorderBrush="{StaticResource NavyBorderBrush}"
+                          BorderThickness="1"
+                          CornerRadius="8"
+                          Padding="10"
+                          Margin="0,0,0,6">
+                    <StackPanel>
+                      <DockPanel>
+                        <TextBlock Text="{Binding TimeDisplay}" DockPanel.Dock="Right" Foreground="{StaticResource TextMutedBrush}" FontSize="11" />
+                        <TextBlock Text="{Binding FileName}" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                      </DockPanel>
+                      <TextBlock Foreground="{StaticResource CyanAccentBrush}" FontSize="11">
+                        <Run Text="{Binding DirectionDisplay}" />
+                        <Run Text=" · " />
+                        <Run Text="{Binding StageDisplay}" />
+                        <Run Text=" · " />
+                        <Run Text="{Binding SizeDisplay}" />
+                      </TextBlock>
+                      <TextBlock Text="{Binding FailureMessage}" Foreground="{StaticResource DangerBrush}" FontSize="11" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+      </Grid>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>
+

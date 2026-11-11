@@ -934,9 +934,8 @@ public sealed class NotesSyncCoordinator : INotesSyncService
         {
             serverConflictedNoteIds.Add(serverConflict.NoteId);
             var normalized = NormalizeConflictForLocalDevice(serverConflict, identity.CustomName, unsyncedById);
-            await _notesRepo.SaveConflictAsync(normalized, cancellationToken).ConfigureAwait(false);
 
-            // Preserve both versions in local revision history so neither edit is ever lost.
+            // Preserve both versions in local revision history BEFORE saving the conflict record so readers never observe a conflict without its archived branches.
             await _notesRepo.AppendRevisionAsync(new NoteRevisionSnapshot
             {
                 NoteId = normalized.NoteId,
@@ -975,6 +974,8 @@ public sealed class NotesSyncCoordinator : INotesSyncService
                     NeedsSync = false
                 }, cancellationToken).ConfigureAwait(false);
             }
+
+            await _notesRepo.SaveConflictAsync(normalized, cancellationToken).ConfigureAwait(false);
         }
 
         foreach (var canonical in response.CanonicalNotes)

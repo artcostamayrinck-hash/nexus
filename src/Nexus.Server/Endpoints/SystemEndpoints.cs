@@ -65,7 +65,7 @@ public static class SystemEndpoints
 
             var dto = new SystemInfoDto(
                 ServiceName: "NEXUS.Server",
-                Version: "0.3.0",
+                Version: localDevice.AppVersion,
                 ContractVersion: ContractVersions.Current,
                 HostDevice: localDevice.ToDeviceInfo(lastSeenAtUtc: clock.UtcNow),
                 Modules: moduleRegistry.GetDescriptors(),

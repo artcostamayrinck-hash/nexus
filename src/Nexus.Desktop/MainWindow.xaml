@@ -9,6 +9,7 @@
         MinHeight="580"
         Background="{StaticResource NavyBaseBrush}"
         Foreground="{StaticResource TextPrimaryBrush}"
+        Icon="Assets/nexus.ico"
         WindowStartupLocation="CenterScreen">
   <Grid>
     <Grid.RowDefinitions>
@@ -57,8 +58,14 @@
                   CornerRadius="10"
                   Padding="12">
             <StackPanel>
-              <TextBlock Text="FASE 01 · 02 · 03 · 04" Foreground="{StaticResource CyanAccentBrush}" FontSize="10" FontWeight="Bold" />
-              <TextBlock Text="LAN, mDNS, VPN Tailscale &amp; Pareamento QR" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0" />
+              <TextBlock Text="NEXUS v1.0 · PRODUÇÃO" Foreground="{StaticResource CyanAccentBrush}" FontSize="10" FontWeight="Bold" />
+              <TextBlock Text="Desktop Host · TLS · Android Sync" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0" />
+              <ProgressBar Height="3"
+                           Margin="0,6,0,0"
+                           IsIndeterminate="True"
+                           Foreground="{StaticResource CyanAccentBrush}"
+                           Background="{StaticResource NavyDeepestBrush}"
+                           Visibility="{Binding IsInitializing, Converter={StaticResource BoolToVisibilityConverter}}" />
             </StackPanel>
           </Border>
         </StackPanel>
@@ -135,6 +142,12 @@
                           Visibility="{Binding DataContext.ActiveSection, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource SectionVisibilityConverter}, ConverterParameter=Realtime}" />
       <views:SyncView DataContext="{Binding Sync}"
                       Visibility="{Binding DataContext.ActiveSection, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource SectionVisibilityConverter}, ConverterParameter=Sync}" />
+      <views:TransferView DataContext="{Binding Transfers}"
+                          Visibility="{Binding DataContext.ActiveSection, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource SectionVisibilityConverter}, ConverterParameter=Transfers}" />
+      <views:ModulesView DataContext="{Binding Modules}"
+                         Visibility="{Binding DataContext.ActiveSection, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource SectionVisibilityConverter}, ConverterParameter=Modules}" />
+      <views:AutomationView DataContext="{Binding Automation}"
+                            Visibility="{Binding DataContext.ActiveSection, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource SectionVisibilityConverter}, ConverterParameter=Automation}" />
       <views:PairingView DataContext="{Binding Pairing}"
                          Visibility="{Binding DataContext.ActiveSection, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource SectionVisibilityConverter}, ConverterParameter=Pairing}" />
       <views:DevicesView DataContext="{Binding Devices}"

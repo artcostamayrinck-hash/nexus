@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Nexus.Mobile.Views.ModulesPage"
+             Title="Módulos">
+  <ScrollView>
+    <VerticalStackLayout Padding="20" Spacing="14">
+      <Label Text="Módulos NEXUS" FontSize="24" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+      <Label Text="{Binding StatusMessage}" FontSize="12" TextColor="{StaticResource CyanAccent}" />
+
+      <Button Text="Sincronizar Estado com Windows" Command="{Binding RefreshAllCommand}" Style="{StaticResource PrimaryButton}" />
+
+      <!-- Control Card -->
+      <Border Style="{StaticResource NexusCard}">
+        <VerticalStackLayout Spacing="8">
+          <Grid ColumnDefinitions="*,Auto">
+            <Label Text="NEXUS CONTROL (CONTROLE REMOTO)" FontSize="12" FontAttributes="Bold" TextColor="{StaticResource TextMuted}" VerticalOptions="Center" />
+            <Switch Grid.Column="1" IsToggled="{Binding IsControlEnabled}" />
+          </Grid>
+          <Label Text="{Binding ControlResultMessage}" FontSize="12" TextColor="{StaticResource TextSecondary}" />
+          <Button Text="Aplicar Estado Control" Command="{Binding ToggleControlCommand}" Style="{StaticResource SecondaryButton}" />
+
+          <!-- Virtual Touchpad -->
+          <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8" Margin="0,4,0,0">
+            <Button Text="Clique Esq." Command="{Binding MouseLeftClickCommand}" Style="{StaticResource PrimaryButton}" />
+            <Button Grid.Column="1" Text="Duplo" Command="{Binding MouseDoubleClickCommand}" Style="{StaticResource SecondaryButton}" />
+            <Button Grid.Column="2" Text="Clique Dir." Command="{Binding MouseRightClickCommand}" Style="{StaticResource SecondaryButton}" />
+          </Grid>
+          <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+            <Button Text="Scroll ↑" Command="{Binding MouseScrollUpCommand}" Style="{StaticResource SecondaryButton}" />
+            <Button Grid.Column="1" Text="Mover Δ" Command="{Binding MouseMoveDeltaCommand}" Style="{StaticResource SecondaryButton}" />
+            <Button Grid.Column="2" Text="Scroll ↓" Command="{Binding MouseScrollDownCommand}" Style="{StaticResource SecondaryButton}" />
+          </Grid>
+
+          <!-- Virtual Keyboard & Shortcuts -->
+          <Entry Placeholder="Enviar texto ao Windows..." Text="{Binding RemoteTextInput}" TextColor="{StaticResource TextPrimary}" PlaceholderColor="{StaticResource TextMuted}" />
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+            <Button Text="Enviar Texto" Command="{Binding SendTextCommand}" Style="{StaticResource PrimaryButton}" />
+            <Picker Grid.Column="1" Title="Tecla" ItemsSource="{Binding AvailableKeys}" SelectedItem="{Binding SelectedKeyName}" TextColor="{StaticResource TextPrimary}" />
+          </Grid>
+          <Button Text="Pressionar Tecla Selecionada" Command="{Binding SendKeyCommand}" Style="{StaticResource SecondaryButton}" />
+
+          <!-- Power Actions with Explicit Confirmation -->
+          <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8" Margin="0,6,0,0">
+            <Button Text="Bloquear" Command="{Binding RequestLockCommand}" Style="{StaticResource SecondaryButton}" />
+            <Button Grid.Column="1" Text="Suspender" Command="{Binding RequestSleepCommand}" Style="{StaticResource SecondaryButton}" />
+            <Button Grid.Column="2" Text="Desligar" Command="{Binding RequestShutdownCommand}" Style="{StaticResource SecondaryButton}" />
+          </Grid>
+          <Border IsVisible="{Binding HasPendingPowerConfirmation}" BackgroundColor="#3B1219" StrokeShape="RoundRectangle 10" Padding="10">
+            <VerticalStackLayout Spacing="6">
+              <Label Text="{Binding PowerConfirmationPrompt}" TextColor="#FCA5A5" FontSize="12" FontAttributes="Bold" />
+              <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                <Button Text="Confirmar Ação" Command="{Binding ConfirmPowerActionCommand}" Style="{StaticResource PrimaryButton}" />
+                <Button Grid.Column="1" Text="Cancelar" Command="{Binding CancelPowerConfirmationCommand}" Style="{StaticResource SecondaryButton}" />
+              </Grid>
+            </VerticalStackLayout>
+          </Border>
+        </VerticalStackLayout>
+      </Border>
+
+      <!-- Media Card -->
+      <Border Style="{StaticResource NexusCard}">
+        <VerticalStackLayout Spacing="8">
+          <Grid ColumnDefinitions="*,Auto">
+            <Label Text="NEXUS MEDIA (PLAYER &amp; VOLUME)" FontSize="12" FontAttributes="Bold" TextColor="{StaticResource TextMuted}" VerticalOptions="Center" />
+            <Switch Grid.Column="1" IsToggled="{Binding IsMediaEnabled}" />
+          </Grid>
+          <Label Text="{Binding RemoteMediaStatusText}" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource CyanAccent}" />
+          <Label Text="{Binding RemoteMediaVolumeText}" FontSize="13" TextColor="{StaticResource TextPrimary}" />
+          <Label Text="{Binding RemoteMediaMetadataNote}" FontSize="11" TextColor="{StaticResource TextMuted}" />
+          <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+            <Button Text="Anterior" Command="{Binding MediaPreviousCommand}" Style="{StaticResource SecondaryButton}" />
+            <Button Grid.Column="1" Text="Play/Pause" Command="{Binding MediaPlayPauseCommand}" Style="{StaticResource PrimaryButton}" />
+            <Button Grid.Column="2" Text="Próxima" Command="{Binding MediaNextCommand}" Style="{StaticResource SecondaryButton}" />
+          </Grid>
+          <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+            <Button Text="Vol -" Command="{Binding VolumeDownCommand}" Style="{StaticResource SecondaryButton}" />
+            <Button Grid.Column="1" Text="Mudo" Command="{Binding ToggleMuteCommand}" Style="{StaticResource SecondaryButton}" />
+            <Button Grid.Column="2" Text="Vol +" Command="{Binding VolumeUpCommand}" Style="{StaticResource SecondaryButton}" />
+          </Grid>
+        </VerticalStackLayout>
+      </Border>
+
+      <!-- Monitor Card -->
+      <Border Style="{StaticResource NexusCard}">
+        <VerticalStackLayout Spacing="6">
+          <Label Text="NEXUS MONITOR (PC WINDOWS)" FontSize="12" FontAttributes="Bold" TextColor="{StaticResource TextMuted}" />
+          <Label Text="{Binding HostCpuSummary}" FontSize="13" TextColor="{StaticResource CyanAccent}" />
+          <Label Text="{Binding HostMemorySummary}" FontSize="13" TextColor="{StaticResource TextPrimary}" />
+          <Label Text="{Binding HostGpuSummary}" FontSize="12" TextColor="{StaticResource TextSecondary}" />
+          <Label Text="{Binding HostTemperatureSummary}" FontSize="12" TextColor="{StaticResource TextMuted}" />
+          <Button Text="Atualizar Telemetria do PC" Command="{Binding RefreshMonitorCommand}" Style="{StaticResource SecondaryButton}" Margin="0,6,0,0" />
+        </VerticalStackLayout>
+      </Border>
+
+      <!-- Notify Card -->
+      <Border Style="{StaticResource NexusCard}">
+        <VerticalStackLayout Spacing="8">
+          <Grid ColumnDefinitions="*,Auto">
+            <Label Text="NEXUS NOTIFY (ANDROID → WINDOWS)" FontSize="12" FontAttributes="Bold" TextColor="{StaticResource TextMuted}" VerticalOptions="Center" />
+            <Switch Grid.Column="1" IsToggled="{Binding IsNotifyEnabled}" />
+          </Grid>
+          <Label Text="{Binding AndroidListenerNotice}" FontSize="11" TextColor="{StaticResource TextSecondary}" />
+          <Button Text="Aplicar Estado Notify" Command="{Binding ToggleNotifyCommand}" Style="{StaticResource SecondaryButton}" />
+          <Entry Placeholder="Nome do App" Text="{Binding TestNotifyAppName}" TextColor="{StaticResource TextPrimary}" PlaceholderColor="{StaticResource TextMuted}" />
+          <Entry Placeholder="Título" Text="{Binding TestNotifyTitle}" TextColor="{StaticResource TextPrimary}" PlaceholderColor="{StaticResource TextMuted}" />
+          <Entry Placeholder="Mensagem" Text="{Binding TestNotifyBody}" TextColor="{StaticResource TextPrimary}" PlaceholderColor="{StaticResource TextMuted}" />
+          <Button Text="Encaminhar Notificação ao Windows" Command="{Binding PushNotificationCommand}" Style="{StaticResource PrimaryButton}" />
+        </VerticalStackLayout>
+      </Border>
+    </VerticalStackLayout>
+  </ScrollView>
+</ContentPage>
+

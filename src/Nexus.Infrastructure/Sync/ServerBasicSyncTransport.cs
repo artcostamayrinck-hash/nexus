@@ -86,83 +86,24 @@ public sealed class ServerBasicSyncTransport : INexusSyncTransport, IDisposable
             cancellationToken);
     }
 
-    private async Task<Result<TResponse>> SendWithRetryAsync<TRequest, TResponse>(
+    private Task<Result<TResponse>> SendWithRetryAsync<TRequest, TResponse>(
         HttpMethod method,
         string relativePath,
         TRequest? body,
         CancellationToken cancellationToken)
-    {
-        var credsResult = await _credentialProvider.GetCredentialsAsync(cancellationToken).ConfigureAwait(false);
-        if (credsResult.IsFailure)
-        {
-            return Result<TResponse>.Failure(credsResult.Error!);
-        }
-
-        var creds = credsResult.Value;
-        var baseEndpoint = creds.ServerEndpoint?.Trim().TrimEnd('/');
-        if (string.IsNullOrWhiteSpace(baseEndpoint))
-        {
-            return Result<TResponse>.Failure(
-                NexusError.Network("Endpoint do servidor indisponível para sincronização.", code: "SYNC_ENDPOINT_UNAVAILABLE"));
-        }
-
-        var attempt = await ExecuteSingleHttpAsync<TRequest, TResponse>(
+        => NexusAuthenticatedJsonHttpExecutor.SendWithRetryAsync<TRequest, TResponse>(
+            _protocolClient,
+            _credentialProvider,
+            _options,
+            _logger,
             method,
-            baseEndpoint,
             relativePath,
-            creds,
             body,
-            cancellationToken).ConfigureAwait(false);
-
-        if (attempt.IsFailure &&
-            attempt.Error?.Code == "REALTIME_AUTH_EXPIRED")
-        {
-            var refreshed = await _credentialProvider.RefreshCredentialsAsync(cancellationToken).ConfigureAwait(false);
-            if (refreshed.IsSuccess)
+            timeout: TimeSpan.FromSeconds(15),
+            missingEndpointCode: "SYNC_ENDPOINT_UNAVAILABLE",
+            missingEndpointMessage: "Endpoint do servidor indisponível para sincronização.",
+            customErrorMapper: static (response, raw) =>
             {
-                var updatedCreds = refreshed.Value with
-                {
-                    ServerEndpoint = string.IsNullOrWhiteSpace(refreshed.Value.ServerEndpoint)
-                        ? baseEndpoint
-                        : refreshed.Value.ServerEndpoint
-                };
-
-                attempt = await ExecuteSingleHttpAsync<TRequest, TResponse>(
-                    method,
-                    updatedCreds.ServerEndpoint.Trim().TrimEnd('/'),
-                    relativePath,
-                    updatedCreds,
-                    body,
-                    cancellationToken).ConfigureAwait(false);
-            }
-        }
-
-        return attempt;
-    }
-
-    private async Task<Result<TResponse>> ExecuteSingleHttpAsync<TRequest, TResponse>(
-        HttpMethod method,
-        string baseEndpoint,
-        string relativePath,
-        RealtimeCredentialBundle creds,
-        TRequest? body,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            using var client = CreateHttpClient(baseEndpoint, creds.TlsThumbprint);
-            using var request = new HttpRequestMessage(method, relativePath);
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", creds.AccessToken);
-
-            if (body is not null)
-            {
-                request.Content = JsonContent.Create(body);
-            }
-
-            using var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode)
-            {
-                var raw = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
                 var code = response.StatusCode switch
                 {
                     HttpStatusCode.Unauthorized => "REALTIME_AUTH_EXPIRED",
@@ -176,45 +117,9 @@ public sealed class ServerBasicSyncTransport : INexusSyncTransport, IDisposable
                     ? ErrorCategory.Unauthorized
                     : ErrorCategory.Network;
 
-                return Result<TResponse>.Failure(
-                    new NexusError(code, $"Sync endpoint returned {(int)response.StatusCode}: {raw}", category));
-            }
-
-            var parsed = await response.Content.ReadFromJsonAsync<TResponse>(cancellationToken: cancellationToken).ConfigureAwait(false);
-            if (parsed is null)
-            {
-                return Result<TResponse>.Failure(
-                    NexusError.Unexpected("Resposta vazia ou inválida do servidor de sincronização.", code: "SYNC_EMPTY_RESPONSE"));
-            }
-
-            return Result<TResponse>.Success(parsed);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Falha de comunicação de sincronização ao chamar {Method} {Path}.", method, relativePath);
-            return Result<TResponse>.Failure(
-                NexusError.Network($"Erro de conexão durante sincronização: {ex.Message}", code: "SYNC_NETWORK_ERROR"));
-        }
-    }
-
-    private HttpClient CreateHttpClient(string baseEndpoint, string? tlsThumbprint)
-    {
-        if (_options.SignalRMessageHandlerFactory is not null)
-        {
-            var handler = _options.SignalRMessageHandlerFactory(baseEndpoint, tlsThumbprint);
-            return new HttpClient(handler, disposeHandler: true)
-            {
-                BaseAddress = new Uri(baseEndpoint.TrimEnd('/') + "/"),
-                Timeout = TimeSpan.FromSeconds(15)
-            };
-        }
-
-        return _protocolClient.CreateHttpClient(baseEndpoint, tlsThumbprint, TimeSpan.FromSeconds(15));
-    }
+                return new NexusError(code, $"Sync endpoint returned {(int)response.StatusCode}: {raw}", category);
+            },
+            cancellationToken: cancellationToken);
 
     private void OnChannelClipboardReceived(object? sender, ClipboardEntryContract entry)
         => RemoteClipboardReceived?.Invoke(this, entry);

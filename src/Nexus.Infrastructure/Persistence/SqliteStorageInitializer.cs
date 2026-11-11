@@ -11,7 +11,7 @@ namespace Nexus.Infrastructure.Persistence;
 /// </summary>
 public sealed class SqliteStorageInitializer : IStorageInitializer
 {
-    private const int CurrentSchemaVersion = 4;
+    private const int CurrentSchemaVersion = 8;
 
     private readonly ISqliteConnectionFactory _connectionFactory;
     private readonly StorageFailureHandler _failureHandler;
@@ -296,6 +296,111 @@ public sealed class SqliteStorageInitializer : IStorageInitializer
                     );
 
                     CREATE INDEX IF NOT EXISTS IX_SyncOperationQueue_Status_Enqueued ON SyncOperationQueue (Status, Scope, EnqueuedAtUtc ASC);
+
+                    CREATE TABLE IF NOT EXISTS FileTransfers (
+                        TransferId TEXT PRIMARY KEY,
+                        CorrelationId TEXT NOT NULL,
+                        SourceDeviceId TEXT NOT NULL,
+                        SourceDeviceName TEXT NOT NULL,
+                        TargetDeviceId TEXT NOT NULL,
+                        TargetDeviceName TEXT NOT NULL,
+                        OriginalFileName TEXT NOT NULL,
+                        SafeFileName TEXT NOT NULL,
+                        ContentType TEXT NOT NULL,
+                        TotalBytes INTEGER NOT NULL,
+                        TransferredBytes INTEGER NOT NULL,
+                        ServerUploadedBytes INTEGER NOT NULL,
+                        Sha256Checksum TEXT NOT NULL,
+                        Direction INTEGER NOT NULL,
+                        State INTEGER NOT NULL,
+                        Stage INTEGER NOT NULL,
+                        DuplicatePolicy INTEGER NOT NULL,
+                        FailureReason INTEGER NOT NULL,
+                        FailureMessage TEXT NULL,
+                        LocalFilePath TEXT NULL,
+                        BytesPerSecond REAL NOT NULL DEFAULT 0,
+                        ChunkSizeBytes INTEGER NOT NULL,
+                        AutoExecute INTEGER NOT NULL DEFAULT 0,
+                        CreatedAtUtc TEXT NOT NULL,
+                        UpdatedAtUtc TEXT NOT NULL,
+                        CompletedAtUtc TEXT NULL,
+                        ContractVersion TEXT NOT NULL
+                    );
+
+                    CREATE INDEX IF NOT EXISTS IX_FileTransfers_State_Updated ON FileTransfers (State, UpdatedAtUtc DESC);
+                    CREATE INDEX IF NOT EXISTS IX_FileTransfers_Direction_Created ON FileTransfers (Direction, CreatedAtUtc DESC);
+
+                    CREATE TABLE IF NOT EXISTS MobileNotifications (
+                        NotificationId TEXT PRIMARY KEY,
+                        SourceDeviceId TEXT NOT NULL,
+                        TargetDeviceId TEXT NULL,
+                        AppName TEXT NOT NULL,
+                        PackageName TEXT NULL,
+                        Title TEXT NOT NULL,
+                        Body TEXT NOT NULL,
+                        Urgency INTEGER NOT NULL,
+                        IsDismissed INTEGER NOT NULL DEFAULT 0,
+                        ForwardedToDesktop INTEGER NOT NULL DEFAULT 1,
+                        FilterOutcome TEXT NOT NULL,
+                        CreatedAtUtc TEXT NOT NULL,
+                        ReceivedAtUtc TEXT NOT NULL,
+                        ContractVersion TEXT NOT NULL
+                    );
+
+                    CREATE INDEX IF NOT EXISTS IX_MobileNotifications_ReceivedAt ON MobileNotifications (ReceivedAtUtc DESC);
+
+                    CREATE TABLE IF NOT EXISTS PanelProfiles (
+                        ProfileId TEXT PRIMARY KEY,
+                        Name TEXT NOT NULL,
+                        IsActive INTEGER NOT NULL DEFAULT 0,
+                        Theme INTEGER NOT NULL,
+                        Accent INTEGER NOT NULL,
+                        GridColumns INTEGER NOT NULL,
+                        Revision INTEGER NOT NULL,
+                        PayloadJson TEXT NOT NULL,
+                        UpdatedAtUtc TEXT NOT NULL,
+                        ContractVersion TEXT NOT NULL
+                    );
+
+                    CREATE TABLE IF NOT EXISTS AutomationRules (
+                        RuleId TEXT PRIMARY KEY,
+                        Name TEXT NOT NULL,
+                        IsEnabled INTEGER NOT NULL DEFAULT 1,
+                        TriggerType INTEGER NOT NULL,
+                        PayloadJson TEXT NOT NULL,
+                        LastExecutedAtUtc TEXT NULL,
+                        UpdatedAtUtc TEXT NOT NULL,
+                        ContractVersion TEXT NOT NULL
+                    );
+
+                    CREATE TABLE IF NOT EXISTS AutomationExecutions (
+                        ExecutionId TEXT PRIMARY KEY,
+                        RuleId TEXT NOT NULL,
+                        RuleName TEXT NOT NULL,
+                        TriggerType INTEGER NOT NULL,
+                        Outcome INTEGER NOT NULL,
+                        Detail TEXT NOT NULL,
+                        CorrelationId TEXT NOT NULL,
+                        DurationMs INTEGER NOT NULL,
+                        ExecutedAtUtc TEXT NOT NULL,
+                        ContractVersion TEXT NOT NULL
+                    );
+
+                    CREATE INDEX IF NOT EXISTS IX_AutomationExecutions_ExecutedAt ON AutomationExecutions (ExecutedAtUtc DESC);
+
+                    CREATE TABLE IF NOT EXISTS UpdateHistory (
+                        RecordId TEXT PRIMARY KEY,
+                        InstalledVersion TEXT NOT NULL,
+                        DiscoveredVersion TEXT NULL,
+                        Visibility INTEGER NOT NULL,
+                        OutcomeStatus INTEGER NOT NULL,
+                        FailureReason INTEGER NOT NULL,
+                        Message TEXT NOT NULL,
+                        RecordedAtUtc TEXT NOT NULL,
+                        ContractVersion TEXT NOT NULL
+                    );
+
+                    CREATE INDEX IF NOT EXISTS IX_UpdateHistory_RecordedAt ON UpdateHistory (RecordedAtUtc DESC);
 
                     INSERT OR IGNORE INTO SchemaMigrations (Version, AppliedAtUtc, Description)
                     VALUES ($version, $appliedAt, $description);

@@ -22,6 +22,11 @@ public static class MobileServicesExtensions
         services.TryAddSingleton<MobileConnectivityViewModel>();
         services.TryAddSingleton<MobileRealtimeViewModel>();
         services.TryAddSingleton<MobileSyncViewModel>();
+        services.TryAddSingleton<MobileTransferViewModel>();
+        services.TryAddSingleton<MobileModulesViewModel>();
+        services.TryAddSingleton<MobilePanelViewModel>();
+        services.TryAddSingleton<MobileAutomateViewModel>();
+        services.TryAddSingleton<MobileUpdateViewModel>();
         services.TryAddSingleton<MobileDevicesViewModel>();
         services.TryAddSingleton<MobileSettingsViewModel>();
 

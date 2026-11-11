@@ -1,8 +1,11 @@
+using Nexus.Contracts.Automation;
 using Nexus.Contracts.Commands;
 using Nexus.Contracts.Connections;
 using Nexus.Contracts.Events;
 using Nexus.Contracts.Messaging;
+using Nexus.Contracts.Modules;
 using Nexus.Contracts.Sync;
+using Nexus.Contracts.Transfers;
 using Nexus.Core.Errors;
 
 namespace Nexus.Core.Connections;
@@ -76,6 +79,13 @@ public interface IRealtimeClientChannel : ITransportChannel, IHeartbeatService, 
     event EventHandler<IReadOnlyList<DevicePresenceSnapshot>>? PresenceUpdated;
     event EventHandler<ClipboardEntryContract>? ClipboardReceived;
     event EventHandler<NexusNoteContract>? NoteChangeReceived;
+    event EventHandler<FileTransferProgressEvent>? TransferProgressReceived;
+    event EventHandler<FileTransferRecord>? TransferAvailableReceived;
+    event EventHandler<MobileNotificationRecord>? MobileNotificationReceived;
+    event EventHandler<MediaPlaybackStateContract>? MediaStateReceived;
+    event EventHandler<IntegrationModuleStatusSnapshot>? ModuleStatusChangedReceived;
+    event EventHandler<PanelProfile>? PanelProfileUpdatedReceived;
+    event EventHandler<AutomationExecutionRecord>? AutomationExecutionReceived;
 
     Task<Result<RealtimeSessionSnapshot>> OpenAuthenticatedAsync(
         string? endpointOverride = null,

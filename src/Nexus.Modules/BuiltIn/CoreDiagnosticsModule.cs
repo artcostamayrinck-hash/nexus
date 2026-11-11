@@ -27,6 +27,13 @@ public static class ModulesServiceCollectionExtensions
     public static IServiceCollection AddNexusModules(this IServiceCollection services)
     {
         services.AddSingleton<INexusModule, CoreDiagnosticsModule>();
+        services.AddSingleton<INexusModule, NexusControlModule>();
+        services.AddSingleton<INexusModule, NexusNotifyModule>();
+        services.AddSingleton<INexusModule, NexusMonitorModule>();
+        services.AddSingleton<INexusModule, NexusMediaModule>();
+        services.AddSingleton<INexusModule, NexusPanelModule>();
+        services.AddSingleton<INexusModule, NexusAutomateModule>();
+        services.AddSingleton<INexusModule, NexusUpdateModule>();
         services.TryAddSingleton<IModuleRegistry>(sp =>
         {
             var modules = sp.GetServices<INexusModule>();

@@ -1,0 +1,311 @@
+name: NEXUS Release — Signed Android APK & GitHub Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versao semantica da release (ex: 1.0.0 ou 1.1.0-rc.1)"
+        required: true
+        type: string
+      android_version_code:
+        description: "VersionCode inteiro monotonico Android (ex: 10000). Deixe vazio para calcular de SemVer."
+        required: false
+        type: string
+      release_notes:
+        description: "Notas adicionais da release"
+        required: false
+        type: string
+      prerelease:
+        description: "Marcar como Pre-release no GitHub Releases"
+        required: false
+        default: false
+        type: boolean
+      publish_release:
+        description: "Publicar GitHub Release com APK, SHA-256 e nexus-update-manifest.json"
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  preflight-solution-tests:
+    name: Preflight — Build & Full Test Suite
+    runs-on: windows-latest
+    env:
+      DOTNET_NOLOGO: "true"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore & Build Nexus.slnx (Release)
+        run: |
+          dotnet restore Nexus.slnx
+          dotnet build Nexus.slnx --configuration Release --no-restore
+
+      - name: Execute All Automated Tests
+        run: dotnet test Nexus.slnx --configuration Release --no-build --verbosity minimal
+
+  build-and-release-android:
+    name: Sign Android Release APK & Publish Release
+    needs: preflight-solution-tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      DOTNET_NOLOGO: "true"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Resolve and validate Semantic Version & Android VersionCode
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            RAW_TAG="${GITHUB_REF_NAME}"
+            SEMVER="${RAW_TAG#v}"
+            TAG_NAME="${RAW_TAG}"
+            IS_PRERELEASE="false"
+            if [[ "$SEMVER" == *"-"* ]]; then
+              IS_PRERELEASE="true"
+            fi
+            SHOULD_PUBLISH="true"
+          else
+            SEMVER="${{ inputs.version }}"
+            SEMVER="${SEMVER#v}"
+            TAG_NAME="v${SEMVER}"
+            IS_PRERELEASE="${{ inputs.prerelease }}"
+            SHOULD_PUBLISH="${{ inputs.publish_release }}"
+          fi
+
+          if ! [[ "$SEMVER" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Versao SemVer invalida: '$SEMVER'. Use MAJOR.MINOR.PATCH[-prerelease]."
+            exit 1
+          fi
+
+          MAJOR="${BASH_REMATCH[1]}"
+          MINOR="${BASH_REMATCH[2]}"
+          PATCH="${BASH_REMATCH[3]}"
+          CORE_VER="${MAJOR}.${MINOR}.${PATCH}"
+
+          USER_CODE="${{ inputs.android_version_code }}"
+          if [[ -n "$USER_CODE" ]]; then
+            if ! [[ "$USER_CODE" =~ ^[0-9]+$ ]] || [[ "$USER_CODE" -lt 1 ]]; then
+              echo "::error::android_version_code invalido: '$USER_CODE'."
+              exit 1
+            fi
+            VERSION_CODE="$USER_CODE"
+          else
+            VERSION_CODE=$(( MAJOR * 10000 + MINOR * 100 + PATCH ))
+            if [[ "$VERSION_CODE" -lt 1 ]]; then
+              VERSION_CODE=1
+            fi
+          fi
+
+          MIN_SERVER=$(jq -r '.minimumCompatibleServerVersion // "1.0.0"' version.json)
+          PKG_ID=$(jq -r '.androidPackageId // "com.nexus.ecosystem"' version.json)
+          PUBLISHED_UTC=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          echo "semver=$SEMVER" >> "$GITHUB_OUTPUT"
+          echo "core_version=$CORE_VER" >> "$GITHUB_OUTPUT"
+          echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "package_id=$PKG_ID" >> "$GITHUB_OUTPUT"
+          echo "min_server=$MIN_SERVER" >> "$GITHUB_OUTPUT"
+          echo "published_utc=$PUBLISHED_UTC" >> "$GITHUB_OUTPUT"
+          echo "is_prerelease=$IS_PRERELEASE" >> "$GITHUB_OUTPUT"
+          echo "should_publish=$SHOULD_PUBLISH" >> "$GITHUB_OUTPUT"
+
+      - name: Validate Production Signing Secrets (NEVER auto-generate release keystore)
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$KEYSTORE_B64" || -z "$KEYSTORE_PASS" || -z "$KEY_ALIAS" || -z "$KEY_PASS" ]]; then
+            echo "::error::Secrets obrigatorios de assinatura ausentes. Configure ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS e ANDROID_KEY_PASSWORD no GitHub. Uma keystore de producao NUNCA deve ser criada automaticamente."
+            exit 1
+          fi
+
+      - name: Setup JDK 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Install .NET MAUI Android workload
+        run: dotnet workload install maui-android
+
+      - name: Materialize Release Keystore & Publish Signed APK
+        id: build_apk
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYSTORE_FILE="${{ runner.temp }}/nexus-release.keystore"
+          trap 'shred -u "$KEYSTORE_FILE" 2>/dev/null || rm -f "$KEYSTORE_FILE"' EXIT
+
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$KEYSTORE_FILE"
+          chmod 600 "$KEYSTORE_FILE"
+
+          SIGNER_SHA256=$(keytool -list -v -keystore "$KEYSTORE_FILE" -alias "$KEY_ALIAS" -storepass:env KEYSTORE_PASS \
+            | grep -i "SHA256:" | head -n1 | sed -E 's/.*SHA256:\s*//I' | tr -d ':' | tr '[:upper:]' '[:lower:]')
+          if [[ ${#SIGNER_SHA256} -ne 64 ]]; then
+            echo "::error::Nao foi possivel extrair o fingerprint SHA-256 do certificado de assinatura do alias configurado."
+            exit 1
+          fi
+
+          dotnet restore src/Nexus.Mobile/Nexus.Mobile.csproj
+          dotnet publish src/Nexus.Mobile/Nexus.Mobile.csproj \
+            -f net10.0-android \
+            -c Release \
+            --no-restore \
+            -p:AndroidPackageFormat=apk \
+            -p:NexusVersion="${{ steps.meta.outputs.core_version }}" \
+            -p:ApplicationDisplayVersion="${{ steps.meta.outputs.semver }}" \
+            -p:NexusAndroidVersionCode="${{ steps.meta.outputs.version_code }}" \
+            -p:AndroidKeyStore=true \
+            -p:AndroidSigningKeyStore="$KEYSTORE_FILE" \
+            -p:AndroidSigningKeyAlias="$KEY_ALIAS" \
+            -p:AndroidSigningStorePass="$KEYSTORE_PASS" \
+            -p:AndroidSigningKeyPass="$KEY_PASS" \
+            -o "${{ runner.temp }}/publish-android"
+
+          SIGNED_APK=$(find "${{ runner.temp }}/publish-android" -maxdepth 2 -type f -name "*-Signed.apk" | head -n1 || true)
+          if [[ -z "$SIGNED_APK" ]]; then
+            echo "::error::APK assinado (-Signed.apk) nao encontrado apos dotnet publish."
+            exit 1
+          fi
+
+          OUT_DIR="${{ runner.temp }}/release-assets"
+          mkdir -p "$OUT_DIR"
+          APK_NAME="nexus-android-${{ steps.meta.outputs.tag_name }}.apk"
+          TARGET_APK="${OUT_DIR}/${APK_NAME}"
+          cp "$SIGNED_APK" "$TARGET_APK"
+
+          APKSIGNER_BIN=$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools" -name apksigner | sort -V | tail -n1 || true)
+          if [[ -n "$APKSIGNER_BIN" ]]; then
+            "$APKSIGNER_BIN" verify --print-certs "$TARGET_APK" > /dev/null
+          fi
+
+          APK_SHA256=$(sha256sum "$TARGET_APK" | awk '{print tolower($1)}')
+          APK_SIZE=$(stat -c%s "$TARGET_APK")
+
+          printf '%s  %s\n' "$APK_SHA256" "$APK_NAME" > "${TARGET_APK}.sha256"
+
+          USER_NOTES="${{ inputs.release_notes }}"
+          DEFAULT_NOTES="NEXUS Android ${{ steps.meta.outputs.tag_name }} (${{ steps.meta.outputs.semver }})."
+          FINAL_NOTES="${USER_NOTES:-$DEFAULT_NOTES}"
+
+          jq -n \
+            --arg version "${{ steps.meta.outputs.semver }}" \
+            --argjson versionCode "${{ steps.meta.outputs.version_code }}" \
+            --arg packageId "${{ steps.meta.outputs.package_id }}" \
+            --arg apkFileName "$APK_NAME" \
+            --arg apkSha256 "$APK_SHA256" \
+            --arg signerSha256 "$SIGNER_SHA256" \
+            --argjson apkSizeBytes "$APK_SIZE" \
+            --arg publishedAtUtc "${{ steps.meta.outputs.published_utc }}" \
+            --arg minServer "${{ steps.meta.outputs.min_server }}" \
+            --argjson isPrerelease "${{ steps.meta.outputs.is_prerelease }}" \
+            --arg releaseNotes "$FINAL_NOTES" \
+            --arg tagName "${{ steps.meta.outputs.tag_name }}" \
+            '{
+              version: $version,
+              androidVersionCode: $versionCode,
+              packageId: $packageId,
+              apkFileName: $apkFileName,
+              apkSha256: $apkSha256,
+              signerCertificateSha256: $signerSha256,
+              apkSizeBytes: $apkSizeBytes,
+              publishedAtUtc: $publishedAtUtc,
+              minimumCompatibleServerVersion: $minServer,
+              isPrerelease: $isPrerelease,
+              releaseNotes: $releaseNotes,
+              tagName: $tagName,
+              contractVersion: "1.0"
+            }' > "${OUT_DIR}/nexus-update-manifest.json"
+
+          echo "out_dir=$OUT_DIR" >> "$GITHUB_OUTPUT"
+          echo "apk_name=$APK_NAME" >> "$GITHUB_OUTPUT"
+          echo "apk_sha256=$APK_SHA256" >> "$GITHUB_OUTPUT"
+          echo "signer_sha256=$SIGNER_SHA256" >> "$GITHUB_OUTPUT"
+
+      - name: Cleanup Keystore If Any Residue Remains
+        if: always()
+        shell: bash
+        run: |
+          rm -f "${{ runner.temp }}/nexus-release.keystore"
+
+      - name: Upload Signed Release Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-android-${{ steps.meta.outputs.tag_name }}
+          path: ${{ steps.build_apk.outputs.out_dir }}/*
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub Release
+        if: steps.meta.outputs.should_publish == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          OUT_DIR="${{ steps.build_apk.outputs.out_dir }}"
+          TAG="${{ steps.meta.outputs.tag_name }}"
+          NOTES_FILE="${{ runner.temp }}/release-notes.md"
+          cat > "$NOTES_FILE" <<'EOF'
+          ## NEXUS Android ${{ steps.meta.outputs.tag_name }}
+          - **Versão**: `${{ steps.meta.outputs.semver }}` (`versionCode: ${{ steps.meta.outputs.version_code }}`)
+          - **Package ID**: `${{ steps.meta.outputs.package_id }}`
+          - **Publicado em**: `${{ steps.meta.outputs.published_utc }}`
+          - **Compatibilidade mínima (`Nexus.Server`)**: `>= ${{ steps.meta.outputs.min_server }}`
+          - **APK SHA-256**: `${{ steps.build_apk.outputs.apk_sha256 }}`
+          - **Assinatura SHA-256 (X.509)**: `${{ steps.build_apk.outputs.signer_sha256 }}`
+
+          ### Notas de Atualização
+          ${{ inputs.release_notes || 'Compilação oficial assinada do aplicativo NEXUS Android.' }}
+          EOF
+
+          PRERELEASE_FLAG=""
+          if [[ "${{ steps.meta.outputs.is_prerelease }}" == "true" ]]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${OUT_DIR}"/* --clobber
+          else
+            gh release create "$TAG" "${OUT_DIR}"/* \
+              --title "NEXUS Android $TAG" \
+              --notes-file "$NOTES_FILE" \
+              $PRERELEASE_FLAG
+          fi
+

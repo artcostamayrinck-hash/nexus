@@ -20,6 +20,10 @@ public static class NexusEventTypes
     public const string CommandUpdated = "nexus.command.updated";
     public const string NotificationReceived = "nexus.notification.received";
     public const string TransferProgressUpdated = "nexus.transfer.progress_updated";
+    public const string TransferStarted = "nexus.transfer.started";
+    public const string TransferCompleted = "nexus.transfer.completed";
+    public const string TransferFailed = "nexus.transfer.failed";
+    public const string TransferCancelled = "nexus.transfer.cancelled";
     public const string SyncCompleted = "nexus.sync.completed";
     public const string SystemHealthChanged = "nexus.system.health_changed";
     public const string PairingStateChanged = "nexus.pairing.state_changed";
@@ -35,6 +39,17 @@ public static class NexusEventTypes
     public const string NoteUpdated = "nexus.note.updated";
     public const string SyncConflictDetected = "nexus.sync.conflict_detected";
     public const string SyncQueueFlushed = "nexus.sync.queue_flushed";
+    public const string ControlExecuted = "nexus.module.control_executed";
+    public const string MobileNotificationForwarded = "nexus.module.notification_forwarded";
+    public const string MonitorTelemetryUpdated = "nexus.module.monitor_updated";
+    public const string MediaStateChanged = "nexus.module.media_changed";
+    public const string ModuleStateChanged = "nexus.module.state_changed";
+    public const string PanelProfileChanged = "nexus.panel.profile_changed";
+    public const string AutomationTriggered = "nexus.automate.triggered";
+    public const string AutomationFailed = "nexus.automate.failed";
+    public const string UpdateCheckCompleted = "nexus.update.check_completed";
+    public const string UpdatePackageVerified = "nexus.update.package_verified";
+    public const string UpdateInstallPrompted = "nexus.update.install_prompted";
 }
 
 public sealed record IntegrationEvent : IVersionedContract, ICorrelatedContract, IValidatableContract

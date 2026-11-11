@@ -4,14 +4,16 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
     <Authors>NEXUS Architecture</Authors>
     <Product>NEXUS Personal Ecosystem</Product>
     <Company>NEXUS</Company>
-    <Version>0.2.0</Version>
-    <AssemblyVersion>0.2.0.0</AssemblyVersion>
-    <FileVersion>0.2.0.0</FileVersion>
+    <NexusVersion Condition="'$(NexusVersion)' == ''">1.0.0</NexusVersion>
+    <NexusAndroidVersionCode Condition="'$(NexusAndroidVersionCode)' == ''">10000</NexusAndroidVersionCode>
+    <Version>$(NexusVersion)</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <NoWarn>$(NoWarn);NU1701</NoWarn>
   </PropertyGroup>
 </Project>
-

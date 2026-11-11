@@ -120,6 +120,42 @@ public sealed class LocalTlsCertificateManager : ITlsCertificateProvider
     public string GetSha256Thumbprint(X509Certificate2 certificate)
         => Convert.ToHexStringLower(certificate.GetCertHash(HashAlgorithmName.SHA256));
 
+    private static bool ValidatePinnedCertificate(
+        System.Security.Cryptography.X509Certificates.X509Certificate? certificate,
+        System.Net.Security.SslPolicyErrors sslPolicyErrors,
+        string? expectedSha256Thumbprint)
+    {
+        if (string.IsNullOrWhiteSpace(expectedSha256Thumbprint))
+        {
+            return sslPolicyErrors == System.Net.Security.SslPolicyErrors.None;
+        }
+
+        if (certificate is null)
+        {
+            return false;
+        }
+
+        var actual = certificate.GetCertHashString(HashAlgorithmName.SHA256);
+        var expected = expectedSha256Thumbprint.Replace(":", string.Empty, StringComparison.Ordinal).Trim();
+        return string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static SocketsHttpHandler CreatePinnedSocketsHandler(string? expectedSha256Thumbprint)
+    {
+        return new SocketsHttpHandler
+        {
+            PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+            PooledConnectionIdleTimeout = TimeSpan.FromSeconds(90),
+            MaxConnectionsPerServer = 8,
+            SslOptions = new System.Net.Security.SslClientAuthenticationOptions
+            {
+                EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
+                RemoteCertificateValidationCallback = (_, cert, _, errors) =>
+                    ValidatePinnedCertificate(cert, errors, expectedSha256Thumbprint)
+            }
+        };
+    }
+
     public static HttpClientHandler CreatePinnedTlsHandler(string? expectedSha256Thumbprint)
     {
         var handler = new HttpClientHandler

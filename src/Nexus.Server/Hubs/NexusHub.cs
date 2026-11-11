@@ -2,13 +2,16 @@ using System.Collections.Concurrent;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using Nexus.Contracts.Automation;
 using Nexus.Contracts.Commands;
 using Nexus.Contracts.Connections;
 using Nexus.Contracts.Devices;
 using Nexus.Contracts.Events;
 using Nexus.Contracts.Messaging;
+using Nexus.Contracts.Modules;
 using Nexus.Contracts.Pairing;
 using Nexus.Contracts.Sync;
+using Nexus.Contracts.Transfers;
 using Nexus.Server.Services;
 
 namespace Nexus.Server.Hubs;
@@ -30,6 +33,13 @@ public interface INexusHubClient
     Task ReceiveSessionNotice(RealtimeSessionSnapshot session);
     Task ReceiveClipboardEntry(ClipboardEntryContract entry);
     Task ReceiveNoteUpdated(NexusNoteContract note);
+    Task ReceiveTransferProgress(FileTransferProgressEvent progress);
+    Task ReceiveTransferAvailable(FileTransferRecord transfer);
+    Task ReceiveMobileNotification(MobileNotificationRecord notification);
+    Task ReceiveMediaState(MediaPlaybackStateContract mediaState);
+    Task ReceiveModuleStatusChanged(IntegrationModuleStatusSnapshot moduleStatus);
+    Task ReceivePanelProfileUpdated(PanelProfile profile);
+    Task ReceiveAutomationExecution(AutomationExecutionRecord record);
 }
 
 public sealed record ConnectedHubSession(

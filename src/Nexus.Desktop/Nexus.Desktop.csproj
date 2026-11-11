@@ -5,7 +5,12 @@
     <UseWPF>true</UseWPF>
     <RootNamespace>Nexus.Desktop</RootNamespace>
     <AssemblyName>Nexus.Desktop</AssemblyName>
+    <ApplicationIcon>Assets\nexus.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
+  <ItemGroup>
+    <Resource Include="Assets\nexus.ico" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Nexus.Contracts\Nexus.Contracts.csproj" />
     <ProjectReference Include="..\Nexus.Core\Nexus.Core.csproj" />

@@ -61,6 +61,43 @@
                      Margin="0,14,0,0" />
         </StackPanel>
       </Border>
+
+      <Border Style="{StaticResource NexusCardStyle}" Margin="0,16,0,0">
+        <StackPanel>
+          <TextBlock Text="NEXUS Update &amp; GitHub Releases" Style="{StaticResource CardHeaderStyle}" Margin="0,0,0,8" />
+          <TextBlock Text="{Binding AppVersionDisplay, StringFormat='Versão local instalada: {0}'}"
+                     Foreground="{StaticResource CyanAccentBrush}"
+                     FontSize="12"
+                     Margin="0,0,0,12" />
+
+          <UniformGrid Columns="2" Margin="0,0,0,12">
+            <StackPanel Margin="0,0,8,0">
+              <TextBlock Text="Proprietário GitHub" Style="{StaticResource LabelMutedStyle}" Margin="0,0,0,6" />
+              <TextBox Text="{Binding UpdateRepositoryOwner, UpdateSourceTrigger=PropertyChanged}"
+                       AutomationProperties.Name="Proprietário GitHub"
+                       Style="{StaticResource NexusTextBoxStyle}" />
+            </StackPanel>
+            <StackPanel Margin="8,0,0,0">
+              <TextBlock Text="Repositório GitHub" Style="{StaticResource LabelMutedStyle}" Margin="0,0,0,6" />
+              <TextBox Text="{Binding UpdateRepositoryName, UpdateSourceTrigger=PropertyChanged}"
+                       AutomationProperties.Name="Repositório GitHub"
+                       Style="{StaticResource NexusTextBoxStyle}" />
+            </StackPanel>
+          </UniformGrid>
+
+          <Button Content="Verificar GitHub Releases (HTTPS)"
+                  AutomationProperties.Name="Verificar GitHub Releases"
+                  Command="{Binding CheckUpdatesCommand}"
+                  HorizontalAlignment="Left"
+                  Style="{StaticResource NexusSecondaryButtonStyle}" />
+
+          <TextBlock Text="{Binding UpdateCheckStatusText}"
+                     Foreground="{StaticResource TextSecondaryBrush}"
+                     FontSize="12"
+                     TextWrapping="Wrap"
+                     Margin="0,12,0,0" />
+        </StackPanel>
+      </Border>
     </StackPanel>
   </ScrollViewer>
 </UserControl>

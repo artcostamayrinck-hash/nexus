@@ -14,16 +14,57 @@ using Nexus.Server.Endpoints;
 using Nexus.Server.Health;
 using Nexus.Server.Hubs;
 using Nexus.Server.Middleware;
+using Nexus.Server.Options;
 using Nexus.Server.Services;
 using Serilog;
 
-var builder = WebApplication.CreateBuilder(args);
+static string[] NormalizeCliArgs(string[] rawArgs)
+{
+    var normalized = new List<string>(rawArgs.Length + 2);
+    for (var i = 0; i < rawArgs.Length; i++)
+    {
+        var arg = rawArgs[i];
+        if (string.Equals(arg, "--data-dir", StringComparison.OrdinalIgnoreCase) && i + 1 < rawArgs.Length)
+        {
+            normalized.Add($"--Nexus:Storage:RootDirectory={rawArgs[++i]}");
+        }
+        else if (string.Equals(arg, "--port", StringComparison.OrdinalIgnoreCase) && i + 1 < rawArgs.Length)
+        {
+            normalized.Add($"--Nexus:Tls:HttpsPort={rawArgs[++i]}");
+        }
+        else
+        {
+            normalized.Add(arg);
+        }
+    }
+
+    var envDataDir = Environment.GetEnvironmentVariable("NEXUS_DATA_DIR");
+    if (!string.IsNullOrWhiteSpace(envDataDir) &&
+        !normalized.Any(a => a.StartsWith("--Nexus:Storage:RootDirectory=", StringComparison.OrdinalIgnoreCase)))
+    {
+        normalized.Add($"--Nexus:Storage:RootDirectory={envDataDir.Trim()}");
+    }
+
+    return normalized.ToArray();
+}
+
+static string ResolveStorageRoot(IConfiguration config)
+{
+    var raw = config["Nexus:Storage:RootDirectory"];
+    if (string.IsNullOrWhiteSpace(raw))
+    {
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NEXUS", "server");
+    }
+
+    return Path.GetFullPath(Environment.ExpandEnvironmentVariables(raw.Trim()));
+}
+
+var builder = WebApplication.CreateBuilder(NormalizeCliArgs(args));
 
 builder.Services.AddSingleton(sp =>
 {
     var config = sp.GetRequiredService<IConfiguration>();
-    var storageRoot = config["Nexus:Storage:RootDirectory"]
-        ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NEXUS", "server");
+    var storageRoot = ResolveStorageRoot(config);
     var dbFileName = config["Nexus:Storage:DatabaseFileName"] ?? "nexus-server.db";
     var disablePooling = config.GetValue<bool>("Nexus:Storage:DisablePooling");
 
@@ -89,11 +130,21 @@ builder.Services.AddNexusModules();
 builder.Services.AddSingleton<INexusPresenceTracker, InMemoryPresenceTracker>();
 builder.Services.AddSingleton<ServerRealtimeCoordinator>();
 builder.Services.AddSingleton<ServerBasicSyncCoordinator>();
+builder.Services.AddSingleton<ServerTransferCoordinator>();
+builder.Services.AddSingleton<ServerIntegrationModulesCoordinator>();
+builder.Services.AddSingleton<ServerPanelAndAutomationCoordinator>();
 builder.Services.AddSingleton(sp =>
 {
     var config = sp.GetRequiredService<IConfiguration>();
-    var rootDir = config["Nexus:Storage:RootDirectory"]
-        ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NEXUS", "server");
+    var opts = new GitHubUpdateRelayOptions();
+    config.GetSection("Nexus:Updates").Bind(opts);
+    return opts;
+});
+builder.Services.AddSingleton<ServerUpdateRelayService>();
+builder.Services.AddSingleton(sp =>
+{
+    var config = sp.GetRequiredService<IConfiguration>();
+    var rootDir = ResolveStorageRoot(config);
     return new LocalHostTokenBridgeOptions
     {
         Enabled = OperatingSystem.IsWindows() && config.GetValue("Nexus:Security:EnableLocalHostBridge", true),
@@ -150,6 +201,10 @@ app.MapPairingAndSecurityEndpoints();
 app.MapConnectivityEndpoints();
 app.MapRealtimeEndpoints();
 app.MapBasicSyncEndpoints();
+app.MapTransferEndpoints();
+app.MapIntegrationModulesEndpoints();
+app.MapPanelAndAutomationEndpoints();
+app.MapUpdateEndpoints();
 app.MapHub<NexusHub>("/hubs/nexus");
 
 app.Run();

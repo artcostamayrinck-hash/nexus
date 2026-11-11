@@ -207,7 +207,9 @@ public sealed class BasicSyncIntegrationTests : IDisposable
         await using var winNode = await CreateConnectedSyncNodeAsync(http, host, "win-off", "Windows Offline", DevicePlatform.Windows, NexusPermission.All);
         await using var androidNode = await CreateConnectedSyncNodeAsync(http, host, "and-off", "Android Peer", DevicePlatform.Android, NexusPermission.All);
 
-        Assert.Null(winNode.Orchestrator.CurrentOverview.LastSyncAtUtc);
+        var initialSyncAt = winNode.Orchestrator.CurrentOverview.LastSyncAtUtc;
+        Assert.NotNull(initialSyncAt);
+        _clock.Advance(TimeSpan.FromMinutes(2));
 
         // Disconnect Windows
         await winNode.Realtime.CloseAsync();
@@ -229,7 +231,7 @@ public sealed class BasicSyncIntegrationTests : IDisposable
         await WaitUntilAsync(async () =>
         {
             var count = (await winNode.QueueRepo.GetPendingCountAsync()).Value;
-            return count == 0 && winNode.Orchestrator.CurrentOverview.LastSyncAtUtc.HasValue;
+            return count == 0 && winNode.Orchestrator.CurrentOverview.LastSyncAtUtc > initialSyncAt;
         });
 
         Assert.Equal(SyncStatus.Completed, winNode.Orchestrator.CurrentOverview.Status);
@@ -313,7 +315,10 @@ public sealed class BasicSyncIntegrationTests : IDisposable
         });
         await winNode.ClipboardService.CaptureAndSendTextAsync("Não entregar quando desligado", manualTrigger: true);
         await Task.Delay(250);
-        Assert.Empty((await androidToggle.ClipboardService.GetHistoryAsync()).Value);
+        Assert.DoesNotContain((await androidToggle.ClipboardService.GetHistoryAsync()).Value, c => c.ContentText == "Não entregar quando desligado");
+
+        await winNode.NotesService.CreateNoteAsync("Nota Privacidade Ativa", "Notas continuam ativas mesmo sem clipboard");
+        await WaitUntilAsync(async () => (await androidToggle.NotesService.ListNotesAsync("Privacidade Ativa")).Value.Count == 1);
     }
 
     private async Task<ConnectedSyncNode> CreateConnectedSyncNodeAsync(

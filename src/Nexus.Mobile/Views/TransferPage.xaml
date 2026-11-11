@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Nexus.Mobile.Views.TransferPage"
+             Title="Transferir">
+  <ScrollView>
+    <VerticalStackLayout Padding="20" Spacing="14">
+      <Label Text="NEXUS Transfer" FontSize="24" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+      <Label Text="{Binding StatusMessage}" FontSize="12" TextColor="{StaticResource CyanAccent}" />
+
+      <!-- Summary & Safe Folder -->
+      <Border Style="{StaticResource NexusCard}">
+        <VerticalStackLayout Spacing="6">
+          <Label Text="RESUMO &amp; PROTEÇÃO" FontSize="11" FontAttributes="Bold" TextColor="{StaticResource TextMuted}" />
+          <Label Text="{Binding SummaryText}" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource CyanAccent}" />
+          <Label Text="Arquivos recebidos nunca são executados automaticamente." FontSize="12" TextColor="{StaticResource TextSecondary}" />
+          <Label Text="{Binding ReceivedFolderPath, StringFormat='Pasta segura: {0}'}" FontSize="11" TextColor="{StaticResource TextMuted}" LineBreakMode="TailTruncation" />
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="8" Margin="0,6,0,0">
+            <Button Text="Sincronizar" Command="{Binding SyncIncomingCommand}" Style="{StaticResource PrimaryButton}" />
+            <Button Grid.Column="1" Text="Retomar" Command="{Binding ResumeInterruptedCommand}" Style="{StaticResource SecondaryButton}" />
+          </Grid>
+        </VerticalStackLayout>
+      </Border>
+
+      <!-- Send Files Card -->
+      <Border Style="{StaticResource NexusCard}">
+        <VerticalStackLayout Spacing="8">
+          <Label Text="ENVIAR ARQUIVOS PARA WINDOWS" FontSize="11" FontAttributes="Bold" TextColor="{StaticResource TextMuted}" />
+          <Picker Title="Selecionar dispositivo autorizado"
+                  ItemsSource="{Binding AuthorizedPeers}"
+                  ItemDisplayBinding="{Binding CustomName}"
+                  SelectedItem="{Binding SelectedPeer}"
+                  TextColor="{StaticResource TextPrimary}" />
+          <Picker Title="Política para duplicados"
+                  ItemsSource="{Binding DuplicatePolicies}"
+                  SelectedItem="{Binding SelectedDuplicatePolicy}"
+                  TextColor="{StaticResource TextPrimary}" />
+          <Grid ColumnDefinitions="*,Auto">
+            <Label Text="Baixar recebidos automaticamente" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center" />
+            <Switch Grid.Column="1" IsToggled="{Binding AutoDownloadIncoming}" />
+          </Grid>
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+            <Label Text="{Binding MaxConcurrentTransfers, StringFormat='Simultâneas máx.: {0}'}" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center" />
+            <Stepper Grid.Column="1" Minimum="1" Maximum="8" Increment="1" Value="{Binding MaxConcurrentTransfers}" />
+          </Grid>
+          <Button Text="Salvar Preferências" Command="{Binding SaveSettingsCommand}" Style="{StaticResource SecondaryButton}" />
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+            <Button Text="Escolher Arquivos" Clicked="OnPickFilesClicked" Style="{StaticResource SecondaryButton}" />
+            <Button Grid.Column="1" Text="Enviar Agora" Command="{Binding SendSelectedFilesCommand}" Style="{StaticResource PrimaryButton}" />
+          </Grid>
+          <CollectionView ItemsSource="{Binding PendingSelectedFiles}" HeightRequest="90">
+            <CollectionView.ItemTemplate>
+              <DataTemplate>
+                <Label Text="{Binding}" FontSize="12" TextColor="{StaticResource TextSecondary}" LineBreakMode="MiddleTruncation" Margin="0,2" />
+              </DataTemplate>
+            </CollectionView.ItemTemplate>
+          </CollectionView>
+        </VerticalStackLayout>
+      </Border>
+
+      <!-- Active Transfers -->
+      <Border Style="{StaticResource NexusCard}">
+        <VerticalStackLayout Spacing="8">
+          <Label Text="TRANSFERÊNCIAS EM ANDAMENTO" FontSize="11" FontAttributes="Bold" TextColor="{StaticResource TextMuted}" />
+          <CollectionView ItemsSource="{Binding ActiveTransfers}" HeightRequest="220">
+            <CollectionView.ItemTemplate>
+              <DataTemplate>
+                <Border Style="{StaticResource NexusCard}" Margin="0,0,0,8" Padding="10">
+                  <VerticalStackLayout Spacing="4">
+                    <Label Text="{Binding FileName}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+                    <Label Text="{Binding StageDisplay}" FontSize="12" TextColor="{StaticResource CyanAccent}" />
+                    <ProgressBar Progress="{Binding ProgressRatio}" ProgressColor="{StaticResource CyanAccent}" />
+                    <Label Text="{Binding ProgressSummary}" FontSize="11" TextColor="{StaticResource TextSecondary}" />
+                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6">
+                      <Button Text="Pausar"
+                              Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.PauseTransferCommand}"
+                              CommandParameter="{Binding}"
+                              IsEnabled="{Binding CanPause}"
+                              Style="{StaticResource SecondaryButton}" />
+                      <Button Grid.Column="1"
+                              Text="Retomar"
+                              Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ResumeTransferCommand}"
+                              CommandParameter="{Binding}"
+                              IsEnabled="{Binding CanResume}"
+                              Style="{StaticResource PrimaryButton}" />
+                      <Button Grid.Column="2"
+                              Text="Cancelar"
+                              Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.CancelTransferCommand}"
+                              CommandParameter="{Binding}"
+                              IsEnabled="{Binding CanCancel}"
+                              Style="{StaticResource SecondaryButton}" />
+                    </Grid>
+                  </VerticalStackLayout>
+                </Border>
+              </DataTemplate>
+            </CollectionView.ItemTemplate>
+          </CollectionView>
+        </VerticalStackLayout>
+      </Border>
+
+      <!-- Received & History -->
+      <Border Style="{StaticResource NexusCard}">
+        <VerticalStackLayout Spacing="8">
+          <Grid ColumnDefinitions="*,Auto">
+            <Label Text="RECEBIDOS &amp; HISTÓRICO" FontSize="11" FontAttributes="Bold" TextColor="{StaticResource TextMuted}" VerticalOptions="Center" />
+            <Button Grid.Column="1" Text="Limpar" Command="{Binding ClearHistoryCommand}" Style="{StaticResource SecondaryButton}" />
+          </Grid>
+          <CollectionView ItemsSource="{Binding HistoryItems}" HeightRequest="190">
+            <CollectionView.ItemTemplate>
+              <DataTemplate>
+                <Border Style="{StaticResource NexusCard}" Margin="0,0,0,6" Padding="10">
+                  <VerticalStackLayout Spacing="2">
+                    <Label Text="{Binding FileName}" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+                    <Label Text="{Binding StageDisplay}" FontSize="12" TextColor="{StaticResource CyanAccent}" />
+                    <Label Text="{Binding SizeDisplay}" FontSize="11" TextColor="{StaticResource TextSecondary}" />
+                    <Label Text="{Binding FailureMessage}" FontSize="11" TextColor="{StaticResource TextMuted}" />
+                  </VerticalStackLayout>
+                </Border>
+              </DataTemplate>
+            </CollectionView.ItemTemplate>
+          </CollectionView>
+        </VerticalStackLayout>
+      </Border>
+    </VerticalStackLayout>
+  </ScrollView>
+</ContentPage>

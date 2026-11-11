@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Nexus.Mobile.Views.AutomatePage"
+             x:Name="AutomateRootPage"
+             Title="Automações">
+  <ScrollView>
+    <VerticalStackLayout Padding="18" Spacing="14">
+      <Label Text="Nexus Automate" FontSize="24" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+      <Label Text="{Binding StatusMessage}" FontSize="12" TextColor="{StaticResource CyanAccent}" />
+
+      <!-- Global Controls & Battery / Android Limits -->
+      <Border Style="{StaticResource NexusCard}">
+        <VerticalStackLayout Spacing="8">
+          <Label Text="CONTROLE DE SEGURANÇA E BATERIA" FontSize="11" FontAttributes="Bold" TextColor="{StaticResource TextMuted}" />
+          <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+            <Label Text="{Binding BatterySummary}" FontSize="13" TextColor="{StaticResource TextPrimary}" VerticalOptions="Center" />
+            <Button Grid.Column="1" Text="Ler Bateria" Command="{Binding RefreshBatteryCommand}" Style="{StaticResource SecondaryButton}" HeightRequest="36" Padding="10,0" FontSize="11" />
+            <Button Grid.Column="2" Text="Sync PC" Command="{Binding SyncRemoteAutomationsCommand}" Style="{StaticResource SecondaryButton}" HeightRequest="36" Padding="10,0" FontSize="11" />
+          </Grid>
+
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+            <Button Text="Kill Switch Emergência"
+                    Command="{Binding ToggleKillSwitchCommand}"
+                    BackgroundColor="#7F1D1D"
+                    TextColor="#FEE2E2"
+                    CornerRadius="10"
+                    HeightRequest="42" />
+            <Button Grid.Column="1"
+                    Text="Alternar Motor Global"
+                    Command="{Binding ToggleGlobalAutomationsCommand}"
+                    Style="{StaticResource SecondaryButton}"
+                    HeightRequest="42" />
+          </Grid>
+
+          <Label Text="{Binding IsKillSwitchActive, StringFormat='Kill Switch Ativo: {0}'}" FontSize="11" FontAttributes="Bold" TextColor="#FCA5A5" />
+          <Label Text="{Binding AndroidLimitationNotice}" FontSize="11" TextColor="{StaticResource TextSecondary}" />
+        </VerticalStackLayout>
+      </Border>
+
+      <!-- Pending Sensitive Confirmation Prompt -->
+      <Border IsVisible="{Binding HasPendingSensitiveApproval}" BackgroundColor="#3B1219" Stroke="#FCA5A5" StrokeThickness="1" StrokeShape="RoundRectangle 12" Padding="12">
+        <VerticalStackLayout Spacing="8">
+          <Label Text="CONFIRMAÇÃO EXPLÍCITA DE AÇÃO SENSÍVEL" FontSize="11" FontAttributes="Bold" TextColor="#FCA5A5" />
+          <Label Text="{Binding SensitiveApprovalPrompt}" FontSize="13" TextColor="{StaticResource TextPrimary}" />
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+            <Button Text="Autorizar Execução" Command="{Binding ApproveAndRunSensitiveRuleCommand}" Style="{StaticResource PrimaryButton}" HeightRequest="38" />
+            <Button Grid.Column="1" Text="Cancelar" Command="{Binding DismissSensitiveApprovalCommand}" Style="{StaticResource SecondaryButton}" HeightRequest="38" />
+          </Grid>
+        </VerticalStackLayout>
+      </Border>
+
+      <!-- Starter Templates -->
+      <Border Style="{StaticResource NexusCard}">
+        <VerticalStackLayout Spacing="8">
+          <Label Text="MODELOS PRONTOS" FontSize="11" FontAttributes="Bold" TextColor="{StaticResource TextMuted}" />
+          <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="8">
+            <Button Text="Conectar → Perfil" Command="{Binding ApplyConnectedProfileTemplateCommand}" Style="{StaticResource SecondaryButton}" HeightRequest="38" FontSize="12" />
+            <Button Grid.Column="1" Text="Transfer → Indicador" Command="{Binding ApplyTransferIndicatorTemplateCommand}" Style="{StaticResource SecondaryButton}" HeightRequest="38" FontSize="12" />
+            <Button Grid.Row="1" Text="Desconectar → Aviso" Command="{Binding ApplyDisconnectNotifyTemplateCommand}" Style="{StaticResource SecondaryButton}" HeightRequest="38" FontSize="12" />
+            <Button Grid.Row="1" Grid.Column="1" Text="Bateria ≤ 20% → Alerta" Command="{Binding ApplyLowBatteryTemplateCommand}" Style="{StaticResource SecondaryButton}" HeightRequest="38" FontSize="12" />
+          </Grid>
+        </VerticalStackLayout>
+      </Border>
+
+      <!-- Rule Builder -->
+      <Border Style="{StaticResource NexusCard}">
+        <VerticalStackLayout Spacing="8">
+          <Label Text="CRIAR / EDITAR REGRA (GATILHO → CONDIÇÕES → AÇÃO)" FontSize="11" FontAttributes="Bold" TextColor="{StaticResource CyanAccent}" />
+          <Entry Placeholder="Nome da automação" Text="{Binding RuleName}" Style="{StaticResource NexusEntry}" />
+          <Entry Placeholder="Descrição (opcional)" Text="{Binding RuleDescription}" Style="{StaticResource NexusEntry}" />
+
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+            <Picker Title="Gatilho" ItemsSource="{Binding AvailableTriggers}" SelectedItem="{Binding SelectedTrigger}" TextColor="{StaticResource TextPrimary}" />
+            <Picker Grid.Column="1" Title="Ação" ItemsSource="{Binding AvailableActionTypes}" SelectedItem="{Binding SelectedActionType}" TextColor="{StaticResource TextPrimary}" />
+          </Grid>
+
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+            <Picker Title="Perfil Alvo" ItemsSource="{Binding AvailableProfiles}" ItemDisplayBinding="{Binding Name}" SelectedItem="{Binding SelectedTargetProfile}" TextColor="{StaticResource TextPrimary}" />
+            <Picker Grid.Column="1" Title="Rota Opcional" ItemsSource="{Binding AvailableRouteFilters}" SelectedItem="{Binding SelectedRouteFilter}" TextColor="{StaticResource TextPrimary}" />
+          </Grid>
+
+          <Entry Placeholder="Título do aviso/indicador" Text="{Binding ActionTitle}" Style="{StaticResource NexusEntry}" />
+          <Entry Placeholder="Mensagem da ação" Text="{Binding ActionMessage}" Style="{StaticResource NexusEntry}" />
+
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+            <Label Text="Exigir dispositivo conectado" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}" FontSize="12" />
+            <Switch Grid.Column="1" IsToggled="{Binding RequireConnectedCondition}" />
+          </Grid>
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+            <Label Text="Pré-autorizar ações sensíveis nesta regra" VerticalOptions="Center" TextColor="{StaticResource TextSecondary}" FontSize="12" />
+            <Switch Grid.Column="1" IsToggled="{Binding AllowSensitiveExecution}" />
+          </Grid>
+
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+            <Button Text="Salvar Regra" Command="{Binding SaveRuleCommand}" Style="{StaticResource PrimaryButton}" HeightRequest="42" />
+            <Button Grid.Column="1" Text="Limpar Editor" Command="{Binding ClearEditorCommand}" Style="{StaticResource SecondaryButton}" HeightRequest="42" />
+          </Grid>
+        </VerticalStackLayout>
+      </Border>
+
+      <!-- Configured Rules -->
+      <Border Style="{StaticResource NexusCard}">
+        <VerticalStackLayout Spacing="8">
+          <Label Text="REGRAS CONFIGURADAS" FontSize="11" FontAttributes="Bold" TextColor="{StaticResource TextMuted}" />
+          <CollectionView ItemsSource="{Binding Rules}">
+            <CollectionView.ItemTemplate>
+              <DataTemplate>
+                <Border BackgroundColor="{StaticResource NavyElevated}" StrokeShape="RoundRectangle 10" Padding="10" Margin="0,4">
+                  <VerticalStackLayout Spacing="4">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <Label Text="{Binding Name}" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+                      <Label Grid.Column="1" Text="{Binding IsEnabled, StringFormat='Ativa: {0}'}" FontSize="11" TextColor="{StaticResource CyanAccent}" />
+                    </Grid>
+                    <Label Text="{Binding Trigger, StringFormat='Gatilho: {0}'}" FontSize="12" TextColor="{StaticResource TextSecondary}" />
+                    <Grid ColumnDefinitions="*,*,*,*,*" ColumnSpacing="4" Margin="0,4,0,0">
+                      <Button Text="At/Des" Command="{Binding BindingContext.ToggleRuleEnabledCommand, Source={x:Reference AutomateRootPage}}" CommandParameter="{Binding .}" HeightRequest="32" Padding="0" FontSize="10" />
+                      <Button Grid.Column="1" Text="Testar" Command="{Binding BindingContext.RunRuleManuallyCommand, Source={x:Reference AutomateRootPage}}" CommandParameter="{Binding .}" HeightRequest="32" Padding="0" FontSize="10" />
+                      <Button Grid.Column="2" Text="Editar" Command="{Binding BindingContext.EditRuleCommand, Source={x:Reference AutomateRootPage}}" CommandParameter="{Binding .}" HeightRequest="32" Padding="0" FontSize="10" />
+                      <Button Grid.Column="3" Text="Clonar" Command="{Binding BindingContext.DuplicateRuleCommand, Source={x:Reference AutomateRootPage}}" CommandParameter="{Binding .}" HeightRequest="32" Padding="0" FontSize="10" />
+                      <Button Grid.Column="4" Text="Del" Command="{Binding BindingContext.DeleteRuleCommand, Source={x:Reference AutomateRootPage}}" CommandParameter="{Binding .}" BackgroundColor="#3B1219" TextColor="#FCA5A5" HeightRequest="32" Padding="0" FontSize="10" />
+                    </Grid>
+                  </VerticalStackLayout>
+                </Border>
+              </DataTemplate>
+            </CollectionView.ItemTemplate>
+          </CollectionView>
+        </VerticalStackLayout>
+      </Border>
+
+      <!-- Execution History -->
+      <Border Style="{StaticResource NexusCard}">
+        <VerticalStackLayout Spacing="8">
+          <Grid ColumnDefinitions="*,Auto">
+            <Label Text="HISTÓRICO DE EXECUÇÕES" FontSize="11" FontAttributes="Bold" TextColor="{StaticResource TextMuted}" VerticalOptions="Center" />
+            <Button Grid.Column="1" Text="Limpar" Command="{Binding ClearHistoryCommand}" HeightRequest="32" Padding="10,0" FontSize="11" />
+          </Grid>
+          <CollectionView ItemsSource="{Binding ExecutionHistory}">
+            <CollectionView.ItemTemplate>
+              <DataTemplate>
+                <VerticalStackLayout Margin="0,4">
+                  <Label Text="{Binding RuleName}" FontSize="13" FontAttributes="Bold" TextColor="{StaticResource TextPrimary}" />
+                  <Label Text="{Binding Outcome}" FontSize="11" TextColor="{StaticResource CyanAccent}" />
+                  <Label Text="{Binding Detail}" FontSize="11" TextColor="{StaticResource TextSecondary}" />
+                </VerticalStackLayout>
+              </DataTemplate>
+            </CollectionView.ItemTemplate>
+          </CollectionView>
+        </VerticalStackLayout>
+      </Border>
+    </VerticalStackLayout>
+  </ScrollView>
+</ContentPage>
+

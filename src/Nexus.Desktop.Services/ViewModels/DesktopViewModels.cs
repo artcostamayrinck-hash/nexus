@@ -2,14 +2,18 @@ using System.Collections.ObjectModel;
 using Nexus.Contracts.Connections;
 using Nexus.Contracts.Devices;
 using Nexus.Contracts.Messaging;
+using Nexus.Contracts.Modules;
 using Nexus.Contracts.Security;
 using Nexus.Core.Abstractions;
+using Nexus.Core.Automation;
 using Nexus.Core.Connections;
 using Nexus.Core.Devices;
 using Nexus.Core.Events;
+using Nexus.Core.Modules;
 using Nexus.Core.Services;
 using Nexus.Core.State;
 using Nexus.Core.Storage;
+using Nexus.Core.Updates;
 using Nexus.Desktop.Services.Connectivity;
 using Nexus.Desktop.Services.Mvvm;
 using Nexus.Desktop.Services.Security;
@@ -31,7 +35,10 @@ public enum DesktopSection
     Pairing = 4,
     Connectivity = 5,
     Realtime = 6,
-    Sync = 7
+    Sync = 7,
+    Transfers = 8,
+    Modules = 9,
+    Automation = 10
 }
 
 public sealed record NavigationTabItem(DesktopSection Section, string Title, string Subtitle, string IconKey);
@@ -47,6 +54,10 @@ public sealed class DashboardViewModel : ObservableObject
     private readonly ICryptographicIdentityProvider _identityProvider;
     private readonly INexusRouteOrchestrator _routeOrchestrator;
     private readonly IEventBus _eventBus;
+    private readonly IModuleSettingsService? _moduleSettings;
+    private readonly IHostMonitorService? _hostMonitor;
+    private readonly IWindowsMediaService? _mediaService;
+    private readonly IAutomationEngine? _automationEngine;
 
     private string _localDeviceName = string.Empty;
     private string _localDeviceIdText = string.Empty;
@@ -60,6 +71,9 @@ public sealed class DashboardViewModel : ObservableObject
     private int _registeredDevicesCount;
     private bool _isServerOnline;
     private string _statusMessage = "Base NEXUS pronta.";
+    private string _quickModulesBadge = "Control · Notify · Monitor · Media";
+    private string _quickHostTelemetryText = "Aguardando coleta do host...";
+    private string _quickMediaSummaryText = "Volume e mídia nativos prontos";
 
     public DashboardViewModel(
         ILocalDeviceContext localDevice,
@@ -70,7 +84,11 @@ public sealed class DashboardViewModel : ObservableObject
         DiagnosticHealthService healthService,
         ICryptographicIdentityProvider identityProvider,
         INexusRouteOrchestrator routeOrchestrator,
-        IEventBus eventBus)
+        IEventBus eventBus,
+        IModuleSettingsService? moduleSettings = null,
+        IHostMonitorService? hostMonitor = null,
+        IWindowsMediaService? mediaService = null,
+        IAutomationEngine? automationEngine = null)
     {
         _localDevice = localDevice;
         _deviceRegistry = deviceRegistry;
@@ -81,18 +99,34 @@ public sealed class DashboardViewModel : ObservableObject
         _identityProvider = identityProvider;
         _routeOrchestrator = routeOrchestrator;
         _eventBus = eventBus;
+        _moduleSettings = moduleSettings;
+        _hostMonitor = hostMonitor;
+        _mediaService = mediaService;
+        _automationEngine = automationEngine;
 
         RefreshCommand = new AsyncRelayCommand(RefreshAsync);
         ProbeServerCommand = new AsyncRelayCommand(ProbeServerAsync);
         EmitDiagnosticEventCommand = new AsyncRelayCommand(EmitDiagnosticEventAsync);
+        OpenModulesCommand = new RelayCommand(() => NavigateToSectionAction?.Invoke(DesktopSection.Modules));
+        OpenAutomationCommand = new RelayCommand(() => NavigateToSectionAction?.Invoke(DesktopSection.Automation));
+        QuickMediaPlayPauseCommand = new AsyncRelayCommand(QuickMediaPlayPauseAsync);
+        QuickVolumeUpCommand = new AsyncRelayCommand(QuickVolumeUpAsync);
+        QuickVolumeDownCommand = new AsyncRelayCommand(QuickVolumeDownAsync);
 
         _routeOrchestrator.StatusChanged += (_, r) => ApplyRouteSummary(r);
     }
+
+    public Action<DesktopSection>? NavigateToSectionAction { get; set; }
 
     public ObservableCollection<string> RecentActivities { get; } = [];
     public AsyncRelayCommand RefreshCommand { get; }
     public AsyncRelayCommand ProbeServerCommand { get; }
     public AsyncRelayCommand EmitDiagnosticEventCommand { get; }
+    public RelayCommand OpenModulesCommand { get; }
+    public RelayCommand OpenAutomationCommand { get; }
+    public AsyncRelayCommand QuickMediaPlayPauseCommand { get; }
+    public AsyncRelayCommand QuickVolumeUpCommand { get; }
+    public AsyncRelayCommand QuickVolumeDownCommand { get; }
 
     public string LocalDeviceName { get => _localDeviceName; private set => SetProperty(ref _localDeviceName, value); }
     public string LocalDeviceIdText { get => _localDeviceIdText; private set => SetProperty(ref _localDeviceIdText, value); }
@@ -106,6 +140,9 @@ public sealed class DashboardViewModel : ObservableObject
     public int RegisteredDevicesCount { get => _registeredDevicesCount; private set => SetProperty(ref _registeredDevicesCount, value); }
     public bool IsServerOnline { get => _isServerOnline; private set => SetProperty(ref _isServerOnline, value); }
     public string StatusMessage { get => _statusMessage; private set => SetProperty(ref _statusMessage, value); }
+    public string QuickModulesBadge { get => _quickModulesBadge; private set => SetProperty(ref _quickModulesBadge, value); }
+    public string QuickHostTelemetryText { get => _quickHostTelemetryText; private set => SetProperty(ref _quickHostTelemetryText, value); }
+    public string QuickMediaSummaryText { get => _quickMediaSummaryText; private set => SetProperty(ref _quickMediaSummaryText, value); }
 
     public async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
@@ -139,7 +176,86 @@ public sealed class DashboardViewModel : ObservableObject
         var snapshot = _connectionManager.CurrentSnapshot;
         ConnectionBadge = TranslateConnectionState(snapshot.State);
         ApplyRouteSummary(_routeOrchestrator.CurrentStatus);
+        await RefreshQuickModulesAsync(cancellationToken);
         AddActivity($"Painel atualizado ({RegisteredDevicesCount} dispositivos registrados).");
+    }
+
+    private async Task RefreshQuickModulesAsync(CancellationToken ct)
+    {
+        if (_moduleSettings is not null)
+        {
+            var modRes = await _moduleSettings.GetModuleStatusesAsync(ct);
+            if (modRes.IsSuccess)
+            {
+                var enabled = modRes.Value.Count(m => m.IsEnabled);
+                QuickModulesBadge = $"{enabled}/{modRes.Value.Count} módulos ativos";
+            }
+        }
+
+        if (_hostMonitor is not null)
+        {
+            var mon = await _hostMonitor.CollectSnapshotAsync(ct);
+            if (mon.IsSuccess)
+            {
+                var cpu = mon.Value.Cpu.UsagePercent.IsAvailable ? $"{mon.Value.Cpu.UsagePercent.Value:F0}%" : "N/D";
+                var ram = mon.Value.Memory.UsagePercent.IsAvailable ? $"{mon.Value.Memory.UsagePercent.Value:F0}%" : "N/D";
+                QuickHostTelemetryText = $"CPU: {cpu} · RAM: {ram} · {mon.Value.Disks.Count} disco(s)";
+            }
+            else
+            {
+                QuickHostTelemetryText = mon.Error!.Message;
+            }
+        }
+
+        if (_mediaService is not null)
+        {
+            var med = await _mediaService.GetCurrentStateAsync(ct);
+            if (med.IsSuccess)
+            {
+                var vol = med.Value.VolumePercent.IsAvailable ? $"{med.Value.VolumePercent.Value}%" : "N/D";
+                QuickMediaSummaryText = $"Volume: {vol} · {med.Value.PlaybackStatus}";
+            }
+            else
+            {
+                QuickMediaSummaryText = med.Error!.Message;
+            }
+        }
+    }
+
+    private async Task QuickMediaPlayPauseAsync(CancellationToken ct)
+    {
+        if (_mediaService is null) return;
+        var res = await _mediaService.ExecuteCommandAsync(new MediaControlCommandRequest
+        {
+            SourceDeviceId = _localDevice.DeviceId,
+            Action = MediaControlAction.PlayPause
+        }, ct);
+        await RefreshQuickModulesAsync(ct);
+        StatusMessage = res.IsSuccess ? "Ação Play/Pause executada." : res.Error!.Message;
+    }
+
+    private async Task QuickVolumeUpAsync(CancellationToken ct)
+    {
+        if (_mediaService is null) return;
+        var res = await _mediaService.ExecuteCommandAsync(new MediaControlCommandRequest
+        {
+            SourceDeviceId = _localDevice.DeviceId,
+            Action = MediaControlAction.VolumeUp
+        }, ct);
+        await RefreshQuickModulesAsync(ct);
+        StatusMessage = res.IsSuccess ? "Volume aumentado." : res.Error!.Message;
+    }
+
+    private async Task QuickVolumeDownAsync(CancellationToken ct)
+    {
+        if (_mediaService is null) return;
+        var res = await _mediaService.ExecuteCommandAsync(new MediaControlCommandRequest
+        {
+            SourceDeviceId = _localDevice.DeviceId,
+            Action = MediaControlAction.VolumeDown
+        }, ct);
+        await RefreshQuickModulesAsync(ct);
+        StatusMessage = res.IsSuccess ? "Volume reduzido." : res.Error!.Message;
     }
 
     private void ApplyRouteSummary(ConnectivityStatusReport report)
@@ -608,6 +724,7 @@ public sealed class SettingsViewModel : ObservableObject
 {
     private readonly IDesktopSettingsService _settingsService;
     private readonly ICryptographicIdentityProvider _identityProvider;
+    private readonly Nexus.Core.Updates.INexusUpdateService? _updateService;
 
     private string _deviceName = Environment.MachineName;
     private string _serverEndpoint = "http://127.0.0.1:5280";
@@ -615,16 +732,23 @@ public sealed class SettingsViewModel : ObservableObject
     private bool _enableSubtleAnimations = true;
     private string _selectedLogLevel = "Information";
     private string _feedbackMessage = string.Empty;
+    private string _appVersionDisplay = "1.0.0";
+    private string _updateRepositoryOwner = "nexus-ecosystem";
+    private string _updateRepositoryName = "nexus";
+    private string _updateCheckStatusText = "Sem verificação recente de GitHub Releases.";
 
     public SettingsViewModel(
         IDesktopSettingsService settingsService,
-        ICryptographicIdentityProvider identityProvider)
+        ICryptographicIdentityProvider identityProvider,
+        Nexus.Core.Updates.INexusUpdateService? updateService = null)
     {
         _settingsService = settingsService;
         _identityProvider = identityProvider;
+        _updateService = updateService;
         LoadCommand = new AsyncRelayCommand(LoadAsync);
         SaveCommand = new AsyncRelayCommand(SaveAsync);
         ResetCommand = new AsyncRelayCommand(ResetAsync);
+        CheckUpdatesCommand = new AsyncRelayCommand(CheckUpdatesAsync);
     }
 
     public IReadOnlyList<string> LogLevels { get; } = ["Debug", "Information", "Warning", "Error"];
@@ -632,6 +756,7 @@ public sealed class SettingsViewModel : ObservableObject
     public AsyncRelayCommand LoadCommand { get; }
     public AsyncRelayCommand SaveCommand { get; }
     public AsyncRelayCommand ResetCommand { get; }
+    public AsyncRelayCommand CheckUpdatesCommand { get; }
 
     public string DeviceName { get => _deviceName; set => SetProperty(ref _deviceName, value); }
     public string ServerEndpoint { get => _serverEndpoint; set => SetProperty(ref _serverEndpoint, value); }
@@ -639,6 +764,10 @@ public sealed class SettingsViewModel : ObservableObject
     public bool EnableSubtleAnimations { get => _enableSubtleAnimations; set => SetProperty(ref _enableSubtleAnimations, value); }
     public string SelectedLogLevel { get => _selectedLogLevel; set => SetProperty(ref _selectedLogLevel, value); }
     public string FeedbackMessage { get => _feedbackMessage; private set => SetProperty(ref _feedbackMessage, value); }
+    public string AppVersionDisplay { get => _appVersionDisplay; private set => SetProperty(ref _appVersionDisplay, value); }
+    public string UpdateRepositoryOwner { get => _updateRepositoryOwner; set => SetProperty(ref _updateRepositoryOwner, value); }
+    public string UpdateRepositoryName { get => _updateRepositoryName; set => SetProperty(ref _updateRepositoryName, value); }
+    public string UpdateCheckStatusText { get => _updateCheckStatusText; private set => SetProperty(ref _updateCheckStatusText, value); }
 
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
@@ -652,6 +781,39 @@ public sealed class SettingsViewModel : ObservableObject
         {
             FeedbackMessage = loaded.Error!.Message;
         }
+
+        if (_updateService is not null)
+        {
+            var installed = await _updateService.GetInstalledVersionAsync(cancellationToken);
+            AppVersionDisplay = $"v{installed.Version} ({installed.PackageId})";
+            var cfg = await _updateService.GetConfigurationAsync(cancellationToken);
+            UpdateRepositoryOwner = cfg.RepositoryOwner;
+            UpdateRepositoryName = cfg.RepositoryName;
+        }
+    }
+
+    private async Task CheckUpdatesAsync(CancellationToken cancellationToken)
+    {
+        if (_updateService is null)
+        {
+            UpdateCheckStatusText = "Serviço Nexus Update não registrado neste host.";
+            return;
+        }
+
+        var cfg = await _updateService.GetConfigurationAsync(cancellationToken);
+        var savedCfg = await _updateService.SaveConfigurationAsync(cfg with
+        {
+            RepositoryOwner = UpdateRepositoryOwner,
+            RepositoryName = UpdateRepositoryName
+        }, cancellationToken);
+        if (savedCfg.IsFailure)
+        {
+            UpdateCheckStatusText = savedCfg.Error!.Message;
+            return;
+        }
+
+        var res = await _updateService.CheckForUpdatesAsync(cancellationToken);
+        UpdateCheckStatusText = res.IsSuccess ? res.Value.Message : res.Error!.Message;
     }
 
     private async Task SaveAsync(CancellationToken cancellationToken)
@@ -788,6 +950,9 @@ public sealed class MainShellViewModel : ObservableObject
         ConnectivityViewModel connectivity,
         RealtimeViewModel realtime,
         SyncViewModel sync,
+        TransferViewModel transfers,
+        ModulesViewModel modules,
+        AutomationViewModel automation,
         PairingViewModel pairing,
         DevicesViewModel devices,
         SettingsViewModel settings,
@@ -804,10 +969,15 @@ public sealed class MainShellViewModel : ObservableObject
         Connectivity = connectivity;
         Realtime = realtime;
         Sync = sync;
+        Transfers = transfers;
+        Modules = modules;
+        Automation = automation;
         Pairing = pairing;
         Devices = devices;
         Settings = settings;
         SystemStatus = systemStatus;
+
+        Dashboard.NavigateToSectionAction = section => ActiveSection = section;
 
         NavigationTabs =
         [
@@ -815,6 +985,9 @@ public sealed class MainShellViewModel : ObservableObject
             new NavigationTabItem(DesktopSection.Connectivity, "Conectividade", "Local, mDNS & Tailscale", "Network"),
             new NavigationTabItem(DesktopSection.Realtime, "Tempo Real", "SignalR, Comandos & ACK", "Pulse"),
             new NavigationTabItem(DesktopSection.Sync, "Sincronização", "Clipboard, Notas & Conflitos", "Sync"),
+            new NavigationTabItem(DesktopSection.Transfers, "Transferências", "Arquivos HTTP & Fila", "Transfer"),
+            new NavigationTabItem(DesktopSection.Modules, "Módulos", "Control, Notify, Monitor & Media", "Modules"),
+            new NavigationTabItem(DesktopSection.Automation, "Painel & Automações", "Widgets, Perfis & Regras", "Automation"),
             new NavigationTabItem(DesktopSection.Pairing, "Pareamento", "QR Code & Confiança", "QrCode"),
             new NavigationTabItem(DesktopSection.Devices, "Dispositivos", "Confiança & Acesso", "Devices"),
             new NavigationTabItem(DesktopSection.SystemStatus, "Status do Sistema", "Saúde & Logs", "Pulse"),
@@ -829,6 +1002,9 @@ public sealed class MainShellViewModel : ObservableObject
     public ConnectivityViewModel Connectivity { get; }
     public RealtimeViewModel Realtime { get; }
     public SyncViewModel Sync { get; }
+    public TransferViewModel Transfers { get; }
+    public ModulesViewModel Modules { get; }
+    public AutomationViewModel Automation { get; }
     public PairingViewModel Pairing { get; }
     public DevicesViewModel Devices { get; }
     public SettingsViewModel Settings { get; }
@@ -840,38 +1016,56 @@ public sealed class MainShellViewModel : ObservableObject
         set => SetProperty(ref _activeSection, value);
     }
 
+    private bool _isInitializing;
+
     public string FooterStatusText { get => _footerStatusText; private set => SetProperty(ref _footerStatusText, value); }
     public string FooterDeviceText { get => _footerDeviceText; private set => SetProperty(ref _footerDeviceText, value); }
     public bool IsStorageReady { get => _isStorageReady; private set => SetProperty(ref _isStorageReady, value); }
+    public bool IsInitializing { get => _isInitializing; private set => SetProperty(ref _isInitializing, value); }
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
-        var init = await _storageInitializer.InitializeAsync(cancellationToken);
-        IsStorageReady = init.IsSuccess;
-
-        await _moduleRegistry.InitializeAllAsync(_serviceProvider, cancellationToken);
-
-        await _deviceRegistry.RegisterOrUpdateAsync(new DeviceRegistrationContract
+        IsInitializing = true;
+        FooterStatusText = "Inicializando núcleo local NEXUS...";
+        try
         {
-            DeviceId = _localDevice.DeviceId,
-            Name = _localDevice.DeviceName,
-            Platform = _localDevice.Platform,
-            Type = _localDevice.DeviceType,
-            OperatingSystemVersion = _localDevice.OperatingSystemVersion,
-            AppVersion = _localDevice.AppVersion,
-            Capabilities = _localDevice.Capabilities
-        }, cancellationToken);
+            var init = await _storageInitializer.InitializeAsync(cancellationToken);
+            IsStorageReady = init.IsSuccess;
 
-        await Dashboard.RefreshAsync(cancellationToken);
-        await Connectivity.InitializeAsync(cancellationToken);
-        await Realtime.InitializeAsync(cancellationToken);
-        await Sync.InitializeAsync(cancellationToken);
-        await Pairing.LoadIdentityAsync(cancellationToken);
-        await Devices.LoadAllAsync(cancellationToken);
-        await Settings.LoadAsync(cancellationToken);
-        await SystemStatus.RefreshAsync(cancellationToken);
+            await _moduleRegistry.InitializeAllAsync(_serviceProvider, cancellationToken);
 
-        UpdateFooter(_stateManager.CurrentState);
+            await _deviceRegistry.RegisterOrUpdateAsync(new DeviceRegistrationContract
+            {
+                DeviceId = _localDevice.DeviceId,
+                Name = _localDevice.DeviceName,
+                Platform = _localDevice.Platform,
+                Type = _localDevice.DeviceType,
+                OperatingSystemVersion = _localDevice.OperatingSystemVersion,
+                AppVersion = _localDevice.AppVersion,
+                Capabilities = _localDevice.Capabilities
+            }, cancellationToken);
+
+            await Task.WhenAll(
+                Settings.LoadAsync(cancellationToken),
+                Pairing.LoadIdentityAsync(cancellationToken),
+                Devices.LoadAllAsync(cancellationToken),
+                Connectivity.InitializeAsync(cancellationToken),
+                Realtime.InitializeAsync(cancellationToken));
+
+            await Task.WhenAll(
+                Dashboard.RefreshAsync(cancellationToken),
+                Sync.InitializeAsync(cancellationToken),
+                Transfers.InitializeAsync(cancellationToken),
+                Modules.InitializeAsync(cancellationToken),
+                Automation.InitializeAsync(cancellationToken),
+                SystemStatus.RefreshAsync(cancellationToken));
+
+            UpdateFooter(_stateManager.CurrentState);
+        }
+        finally
+        {
+            IsInitializing = false;
+        }
     }
 
     private void UpdateFooter(NexusRuntimeState state)

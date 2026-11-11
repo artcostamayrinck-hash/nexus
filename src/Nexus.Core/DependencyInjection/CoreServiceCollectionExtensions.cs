@@ -73,7 +73,10 @@ public sealed class LocalDeviceOptions
         : OperatingSystem.IsAndroid() ? DevicePlatform.Android : DevicePlatform.Linux;
     public DeviceType DeviceType { get; set; } = OperatingSystem.IsAndroid() ? DeviceType.Phone : DeviceType.Desktop;
     public string OperatingSystemVersion { get; set; } = Environment.OSVersion.VersionString;
-    public string AppVersion { get; set; } = "0.2.0";
+    public string AppVersion { get; set; } = typeof(LocalDeviceOptions).Assembly
+        .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+        .OfType<System.Reflection.AssemblyInformationalVersionAttribute>()
+        .FirstOrDefault()?.InformationalVersion?.Split('+')[0] ?? "1.0.0";
     public DeviceCapability? Capabilities { get; set; }
 }
 

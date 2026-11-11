@@ -30,6 +30,9 @@ public static class PairingAndSecurityEndpoints
             return MapResult(result, httpContext);
         });
 
+        static PairingSessionSnapshot ScrubPublicQrPayload(PairingSessionSnapshot snapshot)
+            => snapshot.QrPayloadJson is null ? snapshot : snapshot with { QrPayloadJson = null };
+
         pairing.MapGet("/sessions/{pairingId:guid}", async (
             Guid pairingId,
             IPairingService pairingService,
@@ -37,7 +40,10 @@ public static class PairingAndSecurityEndpoints
             CancellationToken cancellationToken) =>
         {
             var result = await pairingService.GetSessionAsync(pairingId, cancellationToken).ConfigureAwait(false);
-            return MapResult(result, httpContext);
+            var safeResult = result.IsSuccess
+                ? Result<PairingSessionSnapshot>.Success(ScrubPublicQrPayload(result.Value))
+                : result;
+            return MapResult(safeResult, httpContext);
         });
 
         pairing.MapPost("/claim", async (
@@ -50,7 +56,7 @@ public static class PairingAndSecurityEndpoints
             var result = await pairingService.SubmitClaimAsync(claim, cancellationToken).ConfigureAwait(false);
             if (result.IsSuccess)
             {
-                await hubContext.Clients.All.ReceivePairingSnapshot(result.Value).ConfigureAwait(false);
+                await hubContext.Clients.All.ReceivePairingSnapshot(ScrubPublicQrPayload(result.Value)).ConfigureAwait(false);
             }
 
             return MapResult(result, httpContext);
@@ -68,7 +74,7 @@ public static class PairingAndSecurityEndpoints
             var result = await pairingService.ConfirmAsync(normalized, cancellationToken).ConfigureAwait(false);
             if (result.IsSuccess)
             {
-                await hubContext.Clients.All.ReceivePairingSnapshot(result.Value).ConfigureAwait(false);
+                await hubContext.Clients.All.ReceivePairingSnapshot(ScrubPublicQrPayload(result.Value)).ConfigureAwait(false);
             }
 
             return MapResult(result, httpContext);

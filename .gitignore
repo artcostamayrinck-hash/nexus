@@ -11,6 +11,9 @@ bld/
 [Oo]bj/
 [Ll]og/
 [Ll]ogs/
+artifacts/
+dist/
+PublishProfiles/
 
 # .NET / Visual Studio / VS Code
 .vs/
@@ -24,13 +27,33 @@ TestResults/
 coverage*/
 *.trx
 
-# MAUI / Android
+# MAUI / Android packages & build artifacts
 *.apk
 *.aab
-*.keystore
-*.jks
+*.apks
+*.idsig
 [Aa]ndroid/[Oo]bj/
 [Aa]ndroid/[Bb]in/
+AppPackages/
+BundleArtifacts/
+
+# Secrets, keystores, certificates & production credentials (NEVER commit!)
+*.keystore
+*.jks
+*.p12
+*.pfx
+*.pem
+*.key
+*.crt
+*.cer
+*.snk
+*.secret.*
+.env
+.env.*
+secrets/
+appsettings.*.local.json
+!config/*.example.json
+!*.Example.json
 
 # Local SQLite databases & runtime data
 *.db
@@ -40,9 +63,9 @@ coverage*/
 *.sqlite-shm
 *.sqlite-wal
 nexus-data/
+host-bridge/
 
 # OS files
 Thumbs.db
 Desktop.ini
 .DS_Store
-

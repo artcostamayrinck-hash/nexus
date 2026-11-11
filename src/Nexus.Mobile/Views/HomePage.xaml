@@ -40,10 +40,27 @@
         </VerticalStackLayout>
       </Border>
 
+      <Border Style="{StaticResource NexusCard}">
+        <VerticalStackLayout Spacing="6">
+          <Label Text="ACESSO RÁPIDO · MÓDULOS, PAINEL E AUTOMAÇÕES" FontSize="11" FontAttributes="Bold" TextColor="{StaticResource TextMuted}" />
+          <Label Text="Control, Notify, Monitor, Media, Nexus Panel e Nexus Automate prontos para integrar Android e Windows." FontSize="13" TextColor="{StaticResource TextSecondary}" />
+          <Button Text="Abrir Módulos NEXUS" Command="{Binding OpenModulesCommand}" Style="{StaticResource SecondaryButton}" Margin="0,4,0,0" />
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+            <Button Text="Nexus Panel" Command="{Binding OpenPanelCommand}" Style="{StaticResource SecondaryButton}" />
+            <Button Grid.Column="1" Text="Nexus Automate" Command="{Binding OpenAutomateCommand}" Style="{StaticResource SecondaryButton}" />
+          </Grid>
+          <Button Text="Nexus Update (GitHub &amp; APK)" Command="{Binding OpenUpdatesCommand}" Style="{StaticResource SecondaryButton}" />
+        </VerticalStackLayout>
+      </Border>
+
       <Button Text="Atualizar Núcleo"
               SemanticProperties.Description="Atualizar estado do núcleo NEXUS"
               Command="{Binding InitializeCommand}"
               Style="{StaticResource PrimaryButton}" />
+      <ActivityIndicator IsRunning="{Binding IsBusy}"
+                         IsVisible="{Binding IsBusy}"
+                         Color="{StaticResource CyanAccent}"
+                         HorizontalOptions="Center" />
     </VerticalStackLayout>
   </ScrollView>
 </ContentPage>

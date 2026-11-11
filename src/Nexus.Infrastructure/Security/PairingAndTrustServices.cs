@@ -197,13 +197,14 @@ public sealed class PairingCoordinatorService : IPairingService
             var expiredSnapshot = current.Snapshot with
             {
                 State = PairingSessionState.Expired,
-                FailureReason = "O código QR expirou."
+                FailureReason = "O código QR expirou.",
+                QrPayloadJson = null
             };
             await _pairingRepo.UpsertAsync(current with { Snapshot = expiredSnapshot }, cancellationToken).ConfigureAwait(false);
             return Result<PairingSessionSnapshot>.Success(expiredSnapshot);
         }
 
-        return Result<PairingSessionSnapshot>.Success(current.Snapshot);
+        return Result<PairingSessionSnapshot>.Success(current.Snapshot with { QrPayloadJson = null });
     }
 
     public async Task<Result<PairingSessionSnapshot>> SubmitClaimAsync(
@@ -295,7 +296,8 @@ public sealed class PairingCoordinatorService : IPairingService
             CandidateAppVersion = claim.ClientAppVersion,
             CandidatePublicKeyFingerprint = claim.ClientPublicKeyFingerprint,
             VerificationCode = verificationCode,
-            State = PairingSessionState.AwaitingConfirmation
+            State = PairingSessionState.AwaitingConfirmation,
+            QrPayloadJson = null
         };
 
         var updatedSession = session with
@@ -384,7 +386,12 @@ public sealed class PairingCoordinatorService : IPairingService
         var now = _clock.UtcNow;
         if (now > session.Snapshot.ExpiresAtUtc)
         {
-            var expired = session.Snapshot with { State = PairingSessionState.Expired, FailureReason = "Sessão de pareamento expirada." };
+            var expired = session.Snapshot with
+            {
+                State = PairingSessionState.Expired,
+                FailureReason = "Sessão de pareamento expirada.",
+                QrPayloadJson = null
+            };
             await _pairingRepo.UpsertAsync(session with { Snapshot = expired }, cancellationToken).ConfigureAwait(false);
             return Result<PairingSessionSnapshot>.Failure(NexusError.Unauthorized("Pairing session expired before confirmation.", "PAIRING_EXPIRED"));
         }
@@ -401,6 +408,7 @@ public sealed class PairingCoordinatorService : IPairingService
             var rejected = session.Snapshot with
             {
                 State = PairingSessionState.Rejected,
+                QrPayloadJson = null,
                 FailureReason = string.IsNullOrWhiteSpace(confirm.RejectionReason) ? "Pareamento rejeitado pelo usuário." : confirm.RejectionReason,
                 CompletedAtUtc = now
             };
@@ -469,7 +477,8 @@ public sealed class PairingCoordinatorService : IPairingService
         var connectedSnapshot = session.Snapshot with
         {
             State = PairingSessionState.Connected,
-            CompletedAtUtc = now
+            CompletedAtUtc = now,
+            QrPayloadJson = null
         };
 
         var updatedSession = session with

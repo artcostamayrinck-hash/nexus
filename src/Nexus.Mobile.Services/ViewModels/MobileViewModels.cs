@@ -38,6 +38,7 @@ public sealed class HomeViewModel : MobileObservableObject
     private string _storageBadge = "Inicializando...";
     private string _pairedSummaryText = "Não pareado";
     private int _knownDevicesCount;
+    private bool _isBusy;
 
     public HomeViewModel(
         IStorageInitializer storageInitializer,
@@ -61,9 +62,37 @@ public sealed class HomeViewModel : MobileObservableObject
         _pairingClient = pairingClient;
 
         InitializeCommand = new MobileAsyncCommand(InitializeAsync);
+        OpenModulesCommand = new MobileAsyncCommand(_ =>
+        {
+            NavigateToModulesRequested?.Invoke(this, EventArgs.Empty);
+            return Task.CompletedTask;
+        });
+        OpenPanelCommand = new MobileAsyncCommand(_ =>
+        {
+            NavigateToPanelRequested?.Invoke(this, EventArgs.Empty);
+            return Task.CompletedTask;
+        });
+        OpenAutomateCommand = new MobileAsyncCommand(_ =>
+        {
+            NavigateToAutomateRequested?.Invoke(this, EventArgs.Empty);
+            return Task.CompletedTask;
+        });
+        OpenUpdatesCommand = new MobileAsyncCommand(_ =>
+        {
+            NavigateToUpdatesRequested?.Invoke(this, EventArgs.Empty);
+            return Task.CompletedTask;
+        });
     }
 
+    public event EventHandler? NavigateToModulesRequested;
+    public event EventHandler? NavigateToPanelRequested;
+    public event EventHandler? NavigateToAutomateRequested;
+    public event EventHandler? NavigateToUpdatesRequested;
     public MobileAsyncCommand InitializeCommand { get; }
+    public MobileAsyncCommand OpenModulesCommand { get; }
+    public MobileAsyncCommand OpenPanelCommand { get; }
+    public MobileAsyncCommand OpenAutomateCommand { get; }
+    public MobileAsyncCommand OpenUpdatesCommand { get; }
 
     public string DeviceTitle { get => _deviceTitle; private set => SetProperty(ref _deviceTitle, value); }
     public string DeviceSubtitle { get => _deviceSubtitle; private set => SetProperty(ref _deviceSubtitle, value); }
@@ -72,9 +101,13 @@ public sealed class HomeViewModel : MobileObservableObject
     public string StorageBadge { get => _storageBadge; private set => SetProperty(ref _storageBadge, value); }
     public string PairedSummaryText { get => _pairedSummaryText; private set => SetProperty(ref _pairedSummaryText, value); }
     public int KnownDevicesCount { get => _knownDevicesCount; private set => SetProperty(ref _knownDevicesCount, value); }
+    public bool IsBusy { get => _isBusy; private set => SetProperty(ref _isBusy, value); }
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
+        IsBusy = true;
+        try
+        {
         await _storageInitializer.InitializeAsync(cancellationToken);
         await _moduleRegistry.InitializeAllAsync(_serviceProvider, cancellationToken);
 
@@ -114,6 +147,11 @@ public sealed class HomeViewModel : MobileObservableObject
             : "Nenhum host pareado";
 
         ConnectionBadge = _connectionManager.CurrentSnapshot.State.ToString();
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 }
 
@@ -196,6 +234,13 @@ public sealed class ConnectionViewModel : MobileObservableObject, IDisposable
     public string PairedHostName { get => _pairedHostName; private set => SetProperty(ref _pairedHostName, value); }
     public string PairedHostFingerprint { get => _pairedHostFingerprint; private set => SetProperty(ref _pairedHostFingerprint, value); }
     public string PairingFeedback { get => _pairingFeedback; private set => SetProperty(ref _pairingFeedback, value); }
+    public void SetPairingFeedback(string message)
+    {
+        if (!string.IsNullOrWhiteSpace(message))
+        {
+            PairingFeedback = message;
+        }
+    }
 
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {

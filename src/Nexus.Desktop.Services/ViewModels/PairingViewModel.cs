@@ -93,6 +93,13 @@ public sealed class PairingViewModel : ObservableObject, IDisposable
 
     public string StateLabel { get => _stateLabel; private set => SetProperty(ref _stateLabel, value); }
     public string StatusMessage { get => _statusMessage; private set => SetProperty(ref _statusMessage, value); }
+    public void ReportUiFeedback(string message)
+    {
+        if (!string.IsNullOrWhiteSpace(message))
+        {
+            StatusMessage = message;
+        }
+    }
     public string ModeBadge { get => _modeBadge; private set => SetProperty(ref _modeBadge, value); }
 
     public byte[]? QrPngBytes

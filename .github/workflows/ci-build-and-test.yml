@@ -1,0 +1,96 @@
+name: NEXUS CI — Build, Tests & Android Verification
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nexus-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test-core:
+    name: Build Solution & Run Test Suites (Windows/.NET 10)
+    runs-on: windows-latest
+    env:
+      DOTNET_NOLOGO: "true"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore dependencies
+        run: dotnet restore Nexus.slnx --locked-mode 2>$null; if ($LASTEXITCODE -ne 0) { dotnet restore Nexus.slnx }
+
+      - name: Build Nexus.slnx (Release)
+        run: dotnet build Nexus.slnx --configuration Release --no-restore --verbosity minimal
+
+      - name: Run Security, Unit & Integration Tests
+        run: dotnet test Nexus.slnx --configuration Release --no-build --verbosity minimal --logger "trx;LogFileName=nexus-tests.trx" --results-directory TestResults
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-test-results
+          path: TestResults/**/*.trx
+          if-no-files-found: warn
+          retention-days: 14
+
+  verify-android-apk-build:
+    name: Verify Android MAUI Build (Unsigned Debug)
+    needs: build-and-test-core
+    runs-on: ubuntu-latest
+    env:
+      DOTNET_NOLOGO: "true"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Install .NET MAUI Android workload
+        run: dotnet workload install maui-android
+
+      - name: Restore Nexus.Mobile
+        run: dotnet restore src/Nexus.Mobile/Nexus.Mobile.csproj
+
+      - name: Build Android Verification APK (Debug, unsigned with debug key only)
+        run: |
+          dotnet build src/Nexus.Mobile/Nexus.Mobile.csproj \
+            -f net10.0-android \
+            -c Debug \
+            --no-restore \
+            -p:AndroidPackageFormat=apk
+
+      - name: Upload Verification Debug APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-android-debug-verify
+          path: src/Nexus.Mobile/bin/Debug/net10.0-android/**/*.apk
+          if-no-files-found: error
+          retention-days: 7
+
