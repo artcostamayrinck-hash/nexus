@@ -16,7 +16,7 @@ public sealed record EndpointItemDisplay(
     string StatusText,
     bool IsActive);
 
-public sealed class ConnectivityViewModel : ObservableObject
+public sealed class ConnectivityViewModel : ObservableObject, IDisposable
 {
     private readonly INexusRouteOrchestrator _orchestrator;
     private readonly INetworkEnvironmentInspector _networkInspector;
@@ -38,20 +38,22 @@ public sealed class ConnectivityViewModel : ObservableObject
 
     public ConnectivityViewModel(
         INexusRouteOrchestrator orchestrator,
-        INetworkEnvironmentInspector networkInspector)
+        INetworkEnvironmentInspector networkInspector,
+        IUiDispatcher? uiDispatcher = null)
+        : base(uiDispatcher)
     {
         _orchestrator = orchestrator;
         _networkInspector = networkInspector;
 
-        InitializeCommand = new AsyncRelayCommand(InitializeAsync);
-        DiscoverMdnsCommand = new AsyncRelayCommand(DiscoverMdnsAsync);
-        SelectBestRouteCommand = new AsyncRelayCommand(SelectBestRouteAsync);
-        ProbeAllCommand = new AsyncRelayCommand(ProbeAllAsync);
-        DisconnectCommand = new AsyncRelayCommand(DisconnectAsync);
-        AddEndpointCommand = new AsyncRelayCommand(AddEndpointAsync);
-        RemoveEndpointCommand = new AsyncRelayCommand<Guid>(RemoveEndpointAsync);
+        InitializeCommand = new AsyncRelayCommand(InitializeAsync, uiDispatcher: uiDispatcher);
+        DiscoverMdnsCommand = new AsyncRelayCommand(DiscoverMdnsAsync, uiDispatcher: uiDispatcher);
+        SelectBestRouteCommand = new AsyncRelayCommand(SelectBestRouteAsync, uiDispatcher: uiDispatcher);
+        ProbeAllCommand = new AsyncRelayCommand(ProbeAllAsync, uiDispatcher: uiDispatcher);
+        DisconnectCommand = new AsyncRelayCommand(DisconnectAsync, uiDispatcher: uiDispatcher);
+        AddEndpointCommand = new AsyncRelayCommand(AddEndpointAsync, uiDispatcher: uiDispatcher);
+        RemoveEndpointCommand = new AsyncRelayCommand<Guid>(RemoveEndpointAsync, uiDispatcher: uiDispatcher);
 
-        _orchestrator.StatusChanged += (_, report) => ApplyReport(report);
+        _orchestrator.StatusChanged += OnOrchestratorStatusChanged;
     }
 
     public ObservableCollection<EndpointItemDisplay> Endpoints { get; } = [];
@@ -103,7 +105,9 @@ public sealed class ConnectivityViewModel : ObservableObject
         await RefreshLocalInterfacesAsync(cancellationToken).ConfigureAwait(false);
         if (init.IsSuccess)
         {
-            ApplyReport(init.Value);
+            var report = init.Value;
+            var items = BuildEndpointItems(report);
+            await RunOnUiAsync(() => ApplyReport(report, items), cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -117,77 +121,157 @@ public sealed class ConnectivityViewModel : ObservableObject
             ? $"Tailscale: {string.Join(", ", net.TailscaleAddresses.Select(ip => $"https://{ip}:5443"))}"
             : "Tailscale: não conectado neste PC";
 
-        LocalHostAddressesText = $"{lanPart}  |  {tsPart}";
+        var formatted = $"{lanPart}  |  {tsPart}";
+        await RunOnUiAsync(() => LocalHostAddressesText = formatted, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task DiscoverMdnsAsync(CancellationToken cancellationToken)
     {
-        DiagnosticMessage = "Procurando serviços NEXUS via mDNS na rede local...";
+        await RunOnUiAsync(
+            () => DiagnosticMessage = "Procurando serviços NEXUS via mDNS na rede local...",
+            cancellationToken).ConfigureAwait(false);
+
         var res = await _orchestrator.DiscoverLocalEndpointsAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
-        DiagnosticMessage = res.IsSuccess
+        var current = _orchestrator.CurrentStatus;
+        var items = BuildEndpointItems(current);
+        var msg = res.IsSuccess
             ? $"Descoberta mDNS concluída: {res.Value.Count} serviço(s) encontrado(s)."
             : res.Error!.Message;
-        ApplyReport(_orchestrator.CurrentStatus);
+
+        await RunOnUiAsync(() =>
+        {
+            ApplyReport(current, items);
+            DiagnosticMessage = msg;
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task SelectBestRouteAsync(CancellationToken cancellationToken)
     {
-        DiagnosticMessage = "Avaliando rotas (Local primeiro, depois Remoto/Tailscale)...";
+        await RunOnUiAsync(
+            () => DiagnosticMessage = "Avaliando rotas (Local primeiro, depois Remoto/Tailscale)...",
+            cancellationToken).ConfigureAwait(false);
+
         var res = await _orchestrator.SelectAndConnectBestRouteAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
-        DiagnosticMessage = res.IsSuccess
+        var current = _orchestrator.CurrentStatus;
+        var items = BuildEndpointItems(current);
+        var msg = res.IsSuccess
             ? res.Value.StatusReason ?? "Rota selecionada."
             : res.Error!.Message;
-        ApplyReport(_orchestrator.CurrentStatus);
+
+        await RunOnUiAsync(() =>
+        {
+            ApplyReport(current, items);
+            DiagnosticMessage = msg;
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task ProbeAllAsync(CancellationToken cancellationToken)
     {
         var res = await _orchestrator.ProbeAllEndpointsAsync(cancellationToken).ConfigureAwait(false);
-        DiagnosticMessage = res.IsSuccess
+        var current = _orchestrator.CurrentStatus;
+        var items = BuildEndpointItems(current);
+        var msg = res.IsSuccess
             ? $"Verificação concluída: {res.Value.Count(r => r.IsReachable)}/{res.Value.Count} rota(s) alcançável(eis)."
             : res.Error!.Message;
-        ApplyReport(_orchestrator.CurrentStatus);
+
+        await RunOnUiAsync(() =>
+        {
+            ApplyReport(current, items);
+            DiagnosticMessage = msg;
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task DisconnectAsync(CancellationToken cancellationToken)
     {
         await _orchestrator.DisconnectAsync("Desconectado manualmente no Desktop.", cancellationToken).ConfigureAwait(false);
-        DiagnosticMessage = "Conexão encerrada manualmente.";
+        await RunOnUiAsync(() => DiagnosticMessage = "Conexão encerrada manualmente.", cancellationToken).ConfigureAwait(false);
     }
 
     private async Task AddEndpointAsync(CancellationToken cancellationToken)
     {
+        string rawLabel = string.Empty;
+        string rawUrl = string.Empty;
+        ConnectionRouteKind routeKind = ConnectionRouteKind.RemoteVpnTailscale;
+
+        await RunOnUiAsync(() =>
+        {
+            rawLabel = NewEndpointLabel;
+            rawUrl = NewEndpointUrl;
+            routeKind = NewEndpointRouteKind;
+        }, cancellationToken).ConfigureAwait(false);
+
         var req = new RegisterEndpointRequest
         {
             DeviceId = Guid.Empty,
             DeviceName = "Servidor NEXUS",
-            Label = string.IsNullOrWhiteSpace(NewEndpointLabel) ? "Personalizado" : NewEndpointLabel.Trim(),
-            RouteKind = NewEndpointRouteKind,
-            EndpointUrl = NewEndpointUrl.Trim(),
-            Origin = NewEndpointRouteKind == ConnectionRouteKind.RemoteVpnTailscale
+            Label = string.IsNullOrWhiteSpace(rawLabel) ? "Personalizado" : rawLabel.Trim(),
+            RouteKind = routeKind,
+            EndpointUrl = rawUrl.Trim(),
+            Origin = routeKind == ConnectionRouteKind.RemoteVpnTailscale
                 ? EndpointOrigin.TailscalePrivate
                 : EndpointOrigin.Manual
         };
 
         var saved = await _orchestrator.RegisterEndpointAsync(req, cancellationToken).ConfigureAwait(false);
-        DiagnosticMessage = saved.IsSuccess
+        var current = saved.IsSuccess ? _orchestrator.CurrentStatus : null;
+        var items = current is not null ? BuildEndpointItems(current) : null;
+        var msg = saved.IsSuccess
             ? $"Endpoint registrado ({FormatRouteKind(saved.Value.RouteKind)}): {saved.Value.EndpointUrl}"
             : saved.Error!.Message;
 
-        if (saved.IsSuccess)
+        await RunOnUiAsync(() =>
         {
-            ApplyReport(_orchestrator.CurrentStatus);
-        }
+            if (current is not null && items is not null)
+            {
+                ApplyReport(current, items);
+            }
+
+            DiagnosticMessage = msg;
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task RemoveEndpointAsync(Guid endpointId, CancellationToken cancellationToken)
     {
         var res = await _orchestrator.RemoveEndpointAsync(endpointId, cancellationToken).ConfigureAwait(false);
-        DiagnosticMessage = res.IsSuccess ? "Endpoint removido." : res.Error!.Message;
-        ApplyReport(_orchestrator.CurrentStatus);
+        var current = _orchestrator.CurrentStatus;
+        var items = BuildEndpointItems(current);
+        var msg = res.IsSuccess ? "Endpoint removido." : res.Error!.Message;
+
+        await RunOnUiAsync(() =>
+        {
+            ApplyReport(current, items);
+            DiagnosticMessage = msg;
+        }, cancellationToken).ConfigureAwait(false);
     }
 
-    private void ApplyReport(ConnectivityStatusReport report)
+    private void OnOrchestratorStatusChanged(object? sender, ConnectivityStatusReport report)
+    {
+        var items = BuildEndpointItems(report);
+        RunOnUi(() => ApplyReport(report, items));
+    }
+
+    private static IReadOnlyList<EndpointItemDisplay> BuildEndpointItems(ConnectivityStatusReport report)
+    {
+        var list = new List<EndpointItemDisplay>(report.KnownEndpoints.Count);
+        foreach (var ep in report.KnownEndpoints)
+        {
+            var isActive = report.ActiveEndpointId == ep.EndpointId;
+            list.Add(new EndpointItemDisplay(
+                ep.EndpointId,
+                ep.Label,
+                ep.DeviceName,
+                FormatRouteKind(ep.RouteKind),
+                ep.EndpointUrl,
+                ep.LastLatencyMs.HasValue ? $"{ep.LastLatencyMs.Value} ms" : "--",
+                ep.LastConnectedAtUtc.HasValue ? ep.LastConnectedAtUtc.Value.LocalDateTime.ToString("dd/MM HH:mm:ss") : "-",
+                isActive ? "Ativa" : (string.IsNullOrWhiteSpace(ep.LastError) ? "Configurada" : ep.LastError),
+                isActive));
+        }
+
+        return list;
+    }
+
+    private void ApplyReport(ConnectivityStatusReport report, IReadOnlyList<EndpointItemDisplay> preparedItems)
     {
         ConnectionStateText = TranslateState(report.State);
         DeviceNameText = report.DeviceName;
@@ -206,21 +290,7 @@ public sealed class ConnectivityViewModel : ObservableObject
             DiagnosticMessage = report.StatusReason;
         }
 
-        Endpoints.Clear();
-        foreach (var ep in report.KnownEndpoints)
-        {
-            var isActive = report.ActiveEndpointId == ep.EndpointId;
-            Endpoints.Add(new EndpointItemDisplay(
-                ep.EndpointId,
-                ep.Label,
-                ep.DeviceName,
-                FormatRouteKind(ep.RouteKind),
-                ep.EndpointUrl,
-                ep.LastLatencyMs.HasValue ? $"{ep.LastLatencyMs.Value} ms" : "--",
-                ep.LastConnectedAtUtc.HasValue ? ep.LastConnectedAtUtc.Value.LocalDateTime.ToString("dd/MM HH:mm:ss") : "-",
-                isActive ? "Ativa" : (string.IsNullOrWhiteSpace(ep.LastError) ? "Configurada" : ep.LastError),
-                isActive));
-        }
+        ReplaceCollection(Endpoints, preparedItems);
     }
 
     public static string FormatRouteKind(ConnectionRouteKind kind) => kind switch
@@ -242,5 +312,9 @@ public sealed class ConnectivityViewModel : ObservableObject
         ConnectionState.Faulted => "Falha",
         _ => "Desconectado"
     };
-}
 
+    public void Dispose()
+    {
+        _orchestrator.StatusChanged -= OnOrchestratorStatusChanged;
+    }
+}

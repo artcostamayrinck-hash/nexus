@@ -229,11 +229,11 @@
                   <DataTemplate>
                     <Border Background="{StaticResource NavyDeepestBrush}" CornerRadius="8" Padding="8,6" Margin="0,0,0,4">
                       <TextBlock Foreground="{StaticResource TextPrimaryBrush}" FontSize="12">
-                        <Run Text="{Binding DriveName}" FontWeight="SemiBold" />
+                        <Run Text="{Binding DriveName, Mode=OneWay}" FontWeight="SemiBold" />
                         <Run Text=" (" />
-                        <Run Text="{Binding FileSystem}" />
+                        <Run Text="{Binding FileSystem, Mode=OneWay}" />
                         <Run Text=") · " />
-                        <Run Text="{Binding UsedPercent, StringFormat='{}{0:F1}% usado'}" Foreground="{StaticResource CyanAccentBrush}" />
+                        <Run Text="{Binding UsedPercent, StringFormat='{}{0:F1}% usado', Mode=OneWay}" Foreground="{StaticResource CyanAccentBrush}" />
                       </TextBlock>
                     </Border>
                   </DataTemplate>
@@ -248,9 +248,9 @@
                   <DataTemplate>
                     <Border Background="{StaticResource NavyDeepestBrush}" CornerRadius="8" Padding="8,6" Margin="0,0,0,4">
                       <TextBlock Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" TextTrimming="CharacterEllipsis">
-                        <Run Text="{Binding Name}" FontWeight="SemiBold" />
+                        <Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold" />
                         <Run Text=" · " />
-                        <Run Text="{Binding LinkSpeedMbps, StringFormat='{}{0:F0} Mbps'}" Foreground="{StaticResource CyanAccentBrush}" />
+                        <Run Text="{Binding LinkSpeedMbps, StringFormat='{}{0:F0} Mbps', Mode=OneWay}" Foreground="{StaticResource CyanAccentBrush}" />
                       </TextBlock>
                     </Border>
                   </DataTemplate>
@@ -319,9 +319,9 @@
                             VerticalAlignment="Center" />
                     <StackPanel>
                       <TextBlock FontSize="12" Foreground="{StaticResource CyanAccentBrush}" FontWeight="SemiBold">
-                        <Run Text="{Binding AppName}" />
+                        <Run Text="{Binding AppName, Mode=OneWay}" />
                         <Run Text=" · " />
-                        <Run Text="{Binding ReceivedAtUtc.LocalDateTime, StringFormat='HH:mm:ss'}" />
+                        <Run Text="{Binding ReceivedAtUtc.LocalDateTime, StringFormat='HH:mm:ss', Mode=OneWay}" />
                       </TextBlock>
                       <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="13" FontWeight="SemiBold" Margin="0,2,0,2" />
                       <TextBlock Text="{Binding Body}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap" />

@@ -10,7 +10,7 @@ using Nexus.Desktop.Services.Mvvm;
 
 namespace Nexus.Desktop.Services.ViewModels;
 
-public sealed class RealtimeViewModel : ObservableObject
+public sealed class RealtimeViewModel : ObservableObject, IDisposable
 {
     private readonly IRealtimeClientChannel _realtimeClient;
     private readonly IHttpBulkTransferChannel _bulkChannel;
@@ -38,26 +38,28 @@ public sealed class RealtimeViewModel : ObservableObject
         IRealtimeClientChannel realtimeClient,
         IHttpBulkTransferChannel bulkChannel,
         ILocalDeviceContext localDevice,
-        IClock clock)
+        IClock clock,
+        IUiDispatcher? uiDispatcher = null)
+        : base(uiDispatcher)
     {
         _realtimeClient = realtimeClient;
         _bulkChannel = bulkChannel;
         _localDevice = localDevice;
         _clock = clock;
 
-        ConnectCommand = new AsyncRelayCommand(ConnectAsync);
-        DisconnectCommand = new AsyncRelayCommand(DisconnectAsync);
-        RefreshPresenceCommand = new AsyncRelayCommand(RefreshPresenceAsync, () => _realtimeClient.IsConnected);
-        SendHeartbeatCommand = new AsyncRelayCommand(SendHeartbeatAsync, () => _realtimeClient.IsConnected);
-        SendCommandCommand = new AsyncRelayCommand(SendCommandAsync, () => _realtimeClient.IsConnected && SelectedPeer is not null);
-        CancelLastCommandCommand = new AsyncRelayCommand(CancelLastCommandAsync, () => _realtimeClient.IsConnected && _lastCommandId.HasValue && _lastCommandTargetId.HasValue);
-        SendIntegrationEventCommand = new AsyncRelayCommand(SendIntegrationEventAsync, () => _realtimeClient.IsConnected);
-        SendBulkHttpTestCommand = new AsyncRelayCommand(SendBulkHttpTestAsync);
+        ConnectCommand = new AsyncRelayCommand(ConnectAsync, uiDispatcher: uiDispatcher);
+        DisconnectCommand = new AsyncRelayCommand(DisconnectAsync, uiDispatcher: uiDispatcher);
+        RefreshPresenceCommand = new AsyncRelayCommand(RefreshPresenceAsync, () => _realtimeClient.IsConnected, uiDispatcher: uiDispatcher);
+        SendHeartbeatCommand = new AsyncRelayCommand(SendHeartbeatAsync, () => _realtimeClient.IsConnected, uiDispatcher: uiDispatcher);
+        SendCommandCommand = new AsyncRelayCommand(SendCommandAsync, () => _realtimeClient.IsConnected && SelectedPeer is not null, uiDispatcher: uiDispatcher);
+        CancelLastCommandCommand = new AsyncRelayCommand(CancelLastCommandAsync, () => _realtimeClient.IsConnected && _lastCommandId.HasValue && _lastCommandTargetId.HasValue, uiDispatcher: uiDispatcher);
+        SendIntegrationEventCommand = new AsyncRelayCommand(SendIntegrationEventAsync, () => _realtimeClient.IsConnected, uiDispatcher: uiDispatcher);
+        SendBulkHttpTestCommand = new AsyncRelayCommand(SendBulkHttpTestAsync, uiDispatcher: uiDispatcher);
 
-        _realtimeClient.StateChanged += (_, snapshot) => SyncStateSnapshot(snapshot);
-        _realtimeClient.PresenceUpdated += (_, list) => ApplyPresenceList(list);
-        _realtimeClient.MessageReceived += (_, env) => PrependItem(RecentMessages, env, 30);
-        _realtimeClient.AckReceived += (_, ack) => PrependItem(RecentAcks, ack, 30);
+        _realtimeClient.StateChanged += OnRealtimeStateChanged;
+        _realtimeClient.PresenceUpdated += OnRealtimePresenceUpdated;
+        _realtimeClient.MessageReceived += OnRealtimeMessageReceived;
+        _realtimeClient.AckReceived += OnRealtimeAckReceived;
     }
 
     public ObservableCollection<DevicePresenceSnapshot> PresenceItems { get; } = [];
@@ -113,12 +115,19 @@ public sealed class RealtimeViewModel : ObservableObject
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
-        CurrentState = _realtimeClient.State;
-        ApplyPresenceList(_realtimeClient.LivePresence);
-        if (_realtimeClient.CurrentSession is { } session)
+        var initialState = _realtimeClient.State;
+        var initialPresence = OrderPresence(_realtimeClient.LivePresence);
+        var initialSession = _realtimeClient.CurrentSession;
+
+        await RunOnUiAsync(() =>
         {
-            SessionIdText = session.SessionId.ToString("D");
-        }
+            CurrentState = initialState;
+            ApplyPresenceList(initialPresence);
+            if (initialSession is not null)
+            {
+                SessionIdText = initialSession.SessionId.ToString("D");
+            }
+        }, cancellationToken).ConfigureAwait(false);
 
         if (_realtimeClient.IsConnected)
         {
@@ -128,29 +137,50 @@ public sealed class RealtimeViewModel : ObservableObject
 
     private async Task ConnectAsync(CancellationToken cancellationToken)
     {
-        StatusBanner = "Conectando e autenticando no NexusHub (SignalR)...";
+        await RunOnUiAsync(
+            () => StatusBanner = "Conectando e autenticando no NexusHub (SignalR)...",
+            cancellationToken).ConfigureAwait(false);
+
         var opened = await _realtimeClient.OpenAuthenticatedAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
         if (opened.IsFailure)
         {
-            CurrentState = _realtimeClient.State;
-            StatusBanner = $"Falha ao conectar: {opened.Error!.Message}";
+            var errState = _realtimeClient.State;
+            var errMsg = $"Falha ao conectar: {opened.Error!.Message}";
+            await RunOnUiAsync(() =>
+            {
+                CurrentState = errState;
+                StatusBanner = errMsg;
+            }, cancellationToken).ConfigureAwait(false);
             return;
         }
 
-        CurrentState = opened.Value.State;
-        SessionIdText = opened.Value.SessionId.ToString("D");
-        EndpointText = _realtimeClient.LivePresence.FirstOrDefault(p => p.DeviceId == _localDevice.DeviceId)?.RouteSummary ?? "SignalR Ativo";
-        ApplyPresenceList(_realtimeClient.LivePresence);
-        StatusBanner = $"Conectado ao SignalR (Sessão {opened.Value.ConnectionId}).";
+        var ordered = OrderPresence(_realtimeClient.LivePresence);
+        var endpoint = ordered.FirstOrDefault(p => p.DeviceId == _localDevice.DeviceId)?.RouteSummary ?? "SignalR Ativo";
+        var session = opened.Value;
+
+        await RunOnUiAsync(() =>
+        {
+            CurrentState = session.State;
+            SessionIdText = session.SessionId.ToString("D");
+            EndpointText = endpoint;
+            ApplyPresenceList(ordered);
+            StatusBanner = $"Conectado ao SignalR (Sessão {session.ConnectionId}).";
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task DisconnectAsync(CancellationToken cancellationToken)
     {
         await _realtimeClient.CloseAsync(cancellationToken).ConfigureAwait(false);
-        CurrentState = _realtimeClient.State;
-        SessionIdText = "-";
-        ApplyPresenceList(_realtimeClient.LivePresence);
-        StatusBanner = "Sessão SignalR encerrada manualmente.";
+        var nextState = _realtimeClient.State;
+        var ordered = OrderPresence(_realtimeClient.LivePresence);
+
+        await RunOnUiAsync(() =>
+        {
+            CurrentState = nextState;
+            SessionIdText = "-";
+            ApplyPresenceList(ordered);
+            StatusBanner = "Sessão SignalR encerrada manualmente.";
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task RefreshPresenceAsync(CancellationToken cancellationToken)
@@ -158,12 +188,17 @@ public sealed class RealtimeViewModel : ObservableObject
         var result = await _realtimeClient.RefreshPresenceAsync(cancellationToken).ConfigureAwait(false);
         if (result.IsFailure)
         {
-            StatusBanner = result.Error!.Message;
+            var msg = result.Error!.Message;
+            await RunOnUiAsync(() => StatusBanner = msg, cancellationToken).ConfigureAwait(false);
             return;
         }
 
-        ApplyPresenceList(result.Value);
-        StatusBanner = $"Presença atualizada: {OnlinePeersCount} online, {OfflinePeersCount} desconectado(s).";
+        var ordered = OrderPresence(result.Value);
+        await RunOnUiAsync(() =>
+        {
+            ApplyPresenceList(ordered);
+            StatusBanner = $"Presença atualizada: {OnlinePeersCount} online, {OfflinePeersCount} desconectado(s).";
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task SendHeartbeatAsync(CancellationToken cancellationToken)
@@ -171,106 +206,177 @@ public sealed class RealtimeViewModel : ObservableObject
         var ping = await _realtimeClient.SendHeartbeatAsync(cancellationToken).ConfigureAwait(false);
         if (ping.IsFailure)
         {
-            StatusBanner = ping.Error!.Message;
+            var msg = ping.Error!.Message;
+            await RunOnUiAsync(() => StatusBanner = msg, cancellationToken).ConfigureAwait(false);
             return;
         }
 
-        LastHeartbeatText = $"{ping.Value} ms às {_clock.UtcNow.ToLocalTime():HH:mm:ss}";
-        StatusBanner = $"Heartbeat SignalR confirmado em {ping.Value} ms.";
+        var rtt = ping.Value;
+        var nowLocal = _clock.UtcNow.ToLocalTime();
+        await RunOnUiAsync(() =>
+        {
+            LastHeartbeatText = $"{rtt} ms às {nowLocal:HH:mm:ss}";
+            StatusBanner = $"Heartbeat SignalR confirmado em {rtt} ms.";
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task SendCommandAsync(CancellationToken cancellationToken)
     {
-        if (SelectedPeer is null)
+        DevicePresenceSnapshot? peer = null;
+        string cmdName = string.Empty;
+        string cmdArgs = string.Empty;
+
+        await RunOnUiAsync(() =>
         {
-            StatusBanner = "Selecione um dispositivo de destino.";
+            peer = SelectedPeer;
+            cmdName = CommandNameInput.Trim();
+            cmdArgs = CommandArgsInput ?? string.Empty;
+        }, cancellationToken).ConfigureAwait(false);
+
+        if (peer is null)
+        {
+            await RunOnUiAsync(() => StatusBanner = "Selecione um dispositivo de destino.", cancellationToken).ConfigureAwait(false);
             return;
         }
 
         var command = new DeviceCommand
         {
             SourceDeviceId = _realtimeClient.CurrentSession?.DeviceId ?? _localDevice.DeviceId,
-            TargetDeviceId = SelectedPeer.DeviceId,
-            CommandName = CommandNameInput.Trim(),
-            Arguments = new Dictionary<string, string> { ["payload"] = CommandArgsInput ?? string.Empty },
+            TargetDeviceId = peer.DeviceId,
+            CommandName = cmdName,
+            Arguments = new Dictionary<string, string> { ["payload"] = cmdArgs },
             IssuedAtUtc = _clock.UtcNow
         };
 
-        _lastCommandId = command.CommandId;
-        _lastCommandTargetId = command.TargetDeviceId;
-        CancelLastCommandCommand.NotifyCanExecuteChanged();
+        await RunOnUiAsync(() =>
+        {
+            _lastCommandId = command.CommandId;
+            _lastCommandTargetId = command.TargetDeviceId;
+            CancelLastCommandCommand.NotifyCanExecuteChanged();
+        }, cancellationToken).ConfigureAwait(false);
 
-        var ack = await _realtimeClient.SendCommandAsync(command, waitForAck: SelectedPeer.IsRealtimeConnected, cancellationToken)
+        var ack = await _realtimeClient.SendCommandAsync(command, waitForAck: peer.IsRealtimeConnected, cancellationToken)
             .ConfigureAwait(false);
 
         if (ack.IsFailure)
         {
-            StatusBanner = $"Comando rejeitado ({ack.Error!.Code}): {ack.Error.Message}";
+            var errMsg = $"Comando rejeitado ({ack.Error!.Code}): {ack.Error.Message}";
+            await RunOnUiAsync(() => StatusBanner = errMsg, cancellationToken).ConfigureAwait(false);
             return;
         }
 
-        PrependItem(RecentAcks, ack.Value, 30);
-        StatusBanner = $"Comando '{command.CommandName}' confirmado ({ack.Value.Status}) para '{SelectedPeer.DeviceName}'.";
+        var ackValue = ack.Value;
+        await RunOnUiAsync(() =>
+        {
+            PrependCapped(RecentAcks, ackValue, 30);
+            StatusBanner = $"Comando '{command.CommandName}' confirmado ({ackValue.Status}) para '{peer.DeviceName}'.";
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task CancelLastCommandAsync(CancellationToken cancellationToken)
     {
-        if (!_lastCommandId.HasValue || !_lastCommandTargetId.HasValue)
+        Guid? cmdId = null;
+        Guid? targetId = null;
+        await RunOnUiAsync(() =>
+        {
+            cmdId = _lastCommandId;
+            targetId = _lastCommandTargetId;
+        }, cancellationToken).ConfigureAwait(false);
+
+        if (!cmdId.HasValue || !targetId.HasValue)
         {
             return;
         }
 
         var res = await _realtimeClient.CancelCommandAsync(
-            _lastCommandId.Value,
-            _lastCommandTargetId.Value,
+            cmdId.Value,
+            targetId.Value,
             "Cancelado manualmente pelo usuário no Windows",
             cancellationToken).ConfigureAwait(false);
 
-        StatusBanner = res.IsSuccess
-            ? $"Cancelamento em tempo real enviado para o comando {_lastCommandId:D}."
+        var msg = res.IsSuccess
+            ? $"Cancelamento em tempo real enviado para o comando {cmdId:D}."
             : res.Error!.Message;
+
+        await RunOnUiAsync(() => StatusBanner = msg, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task SendIntegrationEventAsync(CancellationToken cancellationToken)
     {
+        string evtType = NexusEventTypes.NotificationReceived;
+        string evtPayload = "{}";
+        Guid? targetPeerId = null;
+
+        await RunOnUiAsync(() =>
+        {
+            evtType = string.IsNullOrWhiteSpace(EventTypeInput) ? NexusEventTypes.NotificationReceived : EventTypeInput.Trim();
+            evtPayload = string.IsNullOrWhiteSpace(EventPayloadInput) ? "{}" : EventPayloadInput;
+            targetPeerId = SelectedPeer?.IsRealtimeConnected == true ? SelectedPeer.DeviceId : null;
+        }, cancellationToken).ConfigureAwait(false);
+
         var integrationEvent = new IntegrationEvent
         {
-            EventType = string.IsNullOrWhiteSpace(EventTypeInput) ? NexusEventTypes.NotificationReceived : EventTypeInput.Trim(),
+            EventType = evtType,
             SourceDeviceId = _realtimeClient.CurrentSession?.DeviceId ?? _localDevice.DeviceId,
-            PayloadJson = string.IsNullOrWhiteSpace(EventPayloadInput) ? "{}" : EventPayloadInput,
+            PayloadJson = evtPayload,
             OccurredAtUtc = _clock.UtcNow
         };
 
         var result = await _realtimeClient.PublishIntegrationEventAsync(
             integrationEvent,
-            SelectedPeer?.IsRealtimeConnected == true ? SelectedPeer.DeviceId : null,
+            targetPeerId,
             ordered: true,
             cancellationToken).ConfigureAwait(false);
 
         if (result.IsFailure)
         {
-            StatusBanner = result.Error!.Message;
+            var errMsg = result.Error!.Message;
+            await RunOnUiAsync(() => StatusBanner = errMsg, cancellationToken).ConfigureAwait(false);
             return;
         }
 
-        PrependItem(RecentAcks, result.Value, 30);
-        StatusBanner = $"Evento '{integrationEvent.EventType}' transmitido ({result.Value.Status}).";
+        var ack = result.Value;
+        await RunOnUiAsync(() =>
+        {
+            PrependCapped(RecentAcks, ack, 30);
+            StatusBanner = $"Evento '{integrationEvent.EventType}' transmitido ({ack.Status}).";
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task SendBulkHttpTestAsync(CancellationToken cancellationToken)
     {
+        Guid? targetPeerId = null;
+        await RunOnUiAsync(() => targetPeerId = SelectedPeer?.DeviceId, cancellationToken).ConfigureAwait(false);
+
         var sampleBytes = new byte[64 * 1024];
         Random.Shared.NextBytes(sampleBytes);
         var upload = await _bulkChannel.UploadLargePayloadAsync(
             sampleBytes,
             "application/octet-stream",
-            SelectedPeer?.DeviceId,
+            targetPeerId,
             cancellationToken: cancellationToken).ConfigureAwait(false);
 
-        BulkTransferStatus = upload.IsSuccess
+        var msg = upload.IsSuccess
             ? $"Upload HTTP OK: {upload.Value.ByteLength} bytes · SHA-256 {upload.Value.Sha256Hex[..12]}..."
             : $"Upload HTTP falhou: {upload.Error!.Message}";
+
+        await RunOnUiAsync(() => BulkTransferStatus = msg, cancellationToken).ConfigureAwait(false);
     }
+
+    private void OnRealtimeStateChanged(object? sender, ConnectionStateSnapshot snapshot)
+        => RunOnUi(() => SyncStateSnapshot(snapshot));
+
+    private void OnRealtimePresenceUpdated(object? sender, IReadOnlyList<DevicePresenceSnapshot> list)
+    {
+        var ordered = OrderPresence(list);
+        RunOnUi(() => ApplyPresenceList(ordered));
+    }
+
+    private void OnRealtimeMessageReceived(object? sender, RealtimeMessageEnvelope env)
+        => RunOnUi(() => PrependCapped(RecentMessages, env, 30));
+
+    private void OnRealtimeAckReceived(object? sender, RealtimeMessageAck ack)
+        => RunOnUi(() => PrependCapped(RecentAcks, ack, 30));
 
     private void SyncStateSnapshot(ConnectionStateSnapshot snapshot)
     {
@@ -282,17 +388,16 @@ public sealed class RealtimeViewModel : ObservableObject
         }
     }
 
-    private void ApplyPresenceList(IReadOnlyList<DevicePresenceSnapshot> items)
+    private static IReadOnlyList<DevicePresenceSnapshot> OrderPresence(IReadOnlyList<DevicePresenceSnapshot> items)
+        => items
+            .OrderByDescending(i => i.IsRealtimeConnected)
+            .ThenBy(i => i.DeviceName, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+    private void ApplyPresenceList(IReadOnlyList<DevicePresenceSnapshot> orderedItems)
     {
         var previousId = SelectedPeer?.DeviceId;
-        PresenceItems.Clear();
-
-        foreach (var item in items
-                     .OrderByDescending(i => i.IsRealtimeConnected)
-                     .ThenBy(i => i.DeviceName, StringComparer.OrdinalIgnoreCase))
-        {
-            PresenceItems.Add(item);
-        }
+        ReplaceCollection(PresenceItems, orderedItems);
 
         OnlinePeersCount = PresenceItems.Count(i => i.IsRealtimeConnected);
         OfflinePeersCount = PresenceItems.Count(i => !i.IsRealtimeConnected);
@@ -311,15 +416,6 @@ public sealed class RealtimeViewModel : ObservableObject
         SendIntegrationEventCommand.NotifyCanExecuteChanged();
     }
 
-    private static void PrependItem<T>(ObservableCollection<T> collection, T item, int cap)
-    {
-        collection.Insert(0, item);
-        while (collection.Count > cap)
-        {
-            collection.RemoveAt(collection.Count - 1);
-        }
-    }
-
     public static string TranslateState(ConnectionState state) => state switch
     {
         ConnectionState.Connected => "Conectado",
@@ -330,4 +426,12 @@ public sealed class RealtimeViewModel : ObservableObject
         ConnectionState.Degraded => "Instável",
         _ => "Desconectado"
     };
+
+    public void Dispose()
+    {
+        _realtimeClient.StateChanged -= OnRealtimeStateChanged;
+        _realtimeClient.PresenceUpdated -= OnRealtimePresenceUpdated;
+        _realtimeClient.MessageReceived -= OnRealtimeMessageReceived;
+        _realtimeClient.AckReceived -= OnRealtimeAckReceived;
+    }
 }

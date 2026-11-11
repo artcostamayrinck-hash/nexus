@@ -49,18 +49,20 @@ public sealed class PairingViewModel : ObservableObject, IDisposable
     public PairingViewModel(
         ICryptographicIdentityProvider identityProvider,
         IDesktopPairingClient pairingClient,
-        DevicesViewModel devicesViewModel)
+        DevicesViewModel devicesViewModel,
+        IUiDispatcher? uiDispatcher = null)
+        : base(uiDispatcher)
     {
         _identityProvider = identityProvider;
         _pairingClient = pairingClient;
         _devicesViewModel = devicesViewModel;
 
-        LoadIdentityCommand = new AsyncRelayCommand(LoadIdentityAsync);
-        GenerateQrCommand = new AsyncRelayCommand(GenerateQrAsync);
-        PollStatusCommand = new AsyncRelayCommand(PollStatusOnceAsync, () => _activePairingId.HasValue);
-        ApprovePairingCommand = new AsyncRelayCommand(ApproveAsync, () => CurrentState == PairingSessionState.AwaitingConfirmation);
-        RejectPairingCommand = new AsyncRelayCommand(RejectAsync, () => CurrentState == PairingSessionState.AwaitingConfirmation);
-        ResetPairingCommand = new AsyncRelayCommand(ResetAsync);
+        LoadIdentityCommand = new AsyncRelayCommand(LoadIdentityAsync, uiDispatcher: uiDispatcher);
+        GenerateQrCommand = new AsyncRelayCommand(GenerateQrAsync, uiDispatcher: uiDispatcher);
+        PollStatusCommand = new AsyncRelayCommand(PollStatusOnceAsync, () => _activePairingId.HasValue, uiDispatcher: uiDispatcher);
+        ApprovePairingCommand = new AsyncRelayCommand(ApproveAsync, () => CurrentState == PairingSessionState.AwaitingConfirmation, uiDispatcher: uiDispatcher);
+        RejectPairingCommand = new AsyncRelayCommand(RejectAsync, () => CurrentState == PairingSessionState.AwaitingConfirmation, uiDispatcher: uiDispatcher);
+        ResetPairingCommand = new AsyncRelayCommand(ResetAsync, uiDispatcher: uiDispatcher);
     }
 
     public AsyncRelayCommand LoadIdentityCommand { get; }
@@ -93,13 +95,15 @@ public sealed class PairingViewModel : ObservableObject, IDisposable
 
     public string StateLabel { get => _stateLabel; private set => SetProperty(ref _stateLabel, value); }
     public string StatusMessage { get => _statusMessage; private set => SetProperty(ref _statusMessage, value); }
+
     public void ReportUiFeedback(string message)
     {
         if (!string.IsNullOrWhiteSpace(message))
         {
-            StatusMessage = message;
+            RunOnUi(() => StatusMessage = message);
         }
     }
+
     public string ModeBadge { get => _modeBadge; private set => SetProperty(ref _modeBadge, value); }
 
     public byte[]? QrPngBytes
@@ -137,130 +141,185 @@ public sealed class PairingViewModel : ObservableObject, IDisposable
         var identity = await _identityProvider.GetOrCreateIdentityAsync(cancellationToken).ConfigureAwait(false);
         if (identity.IsSuccess)
         {
-            LocalDeviceName = identity.Value.CustomName;
-            LocalDeviceIdText = identity.Value.DeviceId.ToString("D");
-            LocalFingerprintDisplay = NexusPairingProtocolClient.FormatFingerprint(identity.Value.PublicKeyFingerprint);
-            RegisteredAtText = $"{identity.Value.RegisteredAtUtc.ToLocalTime():dd/MM/yyyy HH:mm} · v{identity.Value.AppVersion}";
+            var id = identity.Value;
+            await RunOnUiAsync(() =>
+            {
+                LocalDeviceName = id.CustomName;
+                LocalDeviceIdText = id.DeviceId.ToString("D");
+                LocalFingerprintDisplay = NexusPairingProtocolClient.FormatFingerprint(id.PublicKeyFingerprint);
+                RegisteredAtText = $"{id.RegisteredAtUtc.ToLocalTime():dd/MM/yyyy HH:mm} · v{id.AppVersion}";
+            }, cancellationToken).ConfigureAwait(false);
         }
     }
 
     public async Task GenerateQrAsync(CancellationToken cancellationToken = default)
     {
         CancelPolling();
-        await LoadIdentityAsync(cancellationToken);
+        await LoadIdentityAsync(cancellationToken).ConfigureAwait(false);
 
-        CurrentState = PairingSessionState.Validating;
-        StatusMessage = "Gerando QR Code criptográfico temporário...";
+        await RunOnUiAsync(() =>
+        {
+            CurrentState = PairingSessionState.Validating;
+            StatusMessage = "Gerando QR Code criptográfico temporário...";
+        }, cancellationToken).ConfigureAwait(false);
 
-        var started = await _pairingClient.StartPairingAsync(120, cancellationToken);
+        var started = await _pairingClient.StartPairingAsync(120, cancellationToken).ConfigureAwait(false);
         if (started.IsFailure)
         {
-            CurrentState = PairingSessionState.Failed;
-            StatusMessage = started.Error!.Message;
-            QrPngBytes = null;
-            QrPayloadJson = string.Empty;
+            var errMsg = started.Error!.Message;
+            await RunOnUiAsync(() =>
+            {
+                CurrentState = PairingSessionState.Failed;
+                StatusMessage = errMsg;
+                QrPngBytes = null;
+                QrPayloadJson = string.Empty;
+            }, cancellationToken).ConfigureAwait(false);
             return;
         }
 
-        _activePairingId = started.Value.Snapshot.PairingId;
-        _isRemoteMode = started.Value.IsRemoteServer;
-        _endpointUsed = started.Value.EndpointUsed;
-        _tlsThumbprint = started.Value.TlsThumbprint;
-        _expiresAtUtc = started.Value.Snapshot.ExpiresAtUtc;
+        var value = started.Value;
+        await RunOnUiAsync(() =>
+        {
+            _activePairingId = value.Snapshot.PairingId;
+            _isRemoteMode = value.IsRemoteServer;
+            _endpointUsed = value.EndpointUsed;
+            _tlsThumbprint = value.TlsThumbprint;
+            _expiresAtUtc = value.Snapshot.ExpiresAtUtc;
 
-        ModeBadge = _isRemoteMode ? $"Servidor HTTPS/API ({_endpointUsed})" : "Modo Local SQLite";
-        QrPngBytes = started.Value.QrPngBytes;
-        QrPayloadJson = started.Value.Snapshot.QrPayloadJson ?? string.Empty;
-        ResetCandidateInfo();
+            ModeBadge = _isRemoteMode ? $"Servidor HTTPS/API ({_endpointUsed})" : "Modo Local SQLite";
+            QrPngBytes = value.QrPngBytes;
+            QrPayloadJson = value.Snapshot.QrPayloadJson ?? string.Empty;
+            ResetCandidateInfo();
 
-        ApplySnapshot(started.Value.Snapshot);
-        PollStatusCommand.NotifyCanExecuteChanged();
-        UpdateCountdown();
-        StatusMessage = "Escaneie o QR Code no aplicativo NEXUS Android dentro de 2 minutos.";
+            ApplySnapshot(value.Snapshot);
+            PollStatusCommand.NotifyCanExecuteChanged();
+            UpdateCountdown();
+            StatusMessage = "Escaneie o QR Code no aplicativo NEXUS Android dentro de 2 minutos.";
 
-        StartBackgroundPolling();
+            StartBackgroundPolling();
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task PollStatusOnceAsync(CancellationToken cancellationToken = default)
     {
-        if (!_activePairingId.HasValue)
+        Guid? pairingId = null;
+        bool isRemote = false;
+        string endpoint = string.Empty;
+        string? thumbprint = null;
+
+        await RunOnUiAsync(() =>
+        {
+            pairingId = _activePairingId;
+            isRemote = _isRemoteMode;
+            endpoint = _endpointUsed;
+            thumbprint = _tlsThumbprint;
+            if (pairingId.HasValue)
+            {
+                UpdateCountdown();
+            }
+        }, cancellationToken).ConfigureAwait(false);
+
+        if (!pairingId.HasValue)
         {
             return;
         }
 
-        UpdateCountdown();
-
         var result = await _pairingClient.GetSessionAsync(
-            _activePairingId.Value,
-            _isRemoteMode,
-            _endpointUsed,
-            _tlsThumbprint,
-            cancellationToken);
+            pairingId.Value,
+            isRemote,
+            endpoint,
+            thumbprint,
+            cancellationToken).ConfigureAwait(false);
 
         if (result.IsFailure)
         {
-            StatusMessage = result.Error!.Message;
+            var msg = result.Error!.Message;
+            await RunOnUiAsync(() => StatusMessage = msg, cancellationToken).ConfigureAwait(false);
             return;
         }
 
-        ApplySnapshot(result.Value);
+        var snapshot = result.Value;
+        await RunOnUiAsync(() => ApplySnapshot(snapshot), cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task ApproveAsync(CancellationToken cancellationToken = default)
-    {
-        await ConfirmDecisionAsync(approve: true, rejectionReason: null, cancellationToken);
-    }
+    public Task ApproveAsync(CancellationToken cancellationToken = default)
+        => ConfirmDecisionAsync(approve: true, rejectionReason: null, cancellationToken);
 
-    public async Task RejectAsync(CancellationToken cancellationToken = default)
-    {
-        await ConfirmDecisionAsync(approve: false, rejectionReason: "Recusado manualmente no Windows", cancellationToken);
-    }
+    public Task RejectAsync(CancellationToken cancellationToken = default)
+        => ConfirmDecisionAsync(approve: false, rejectionReason: "Recusado manualmente no Windows", cancellationToken);
 
     private async Task ConfirmDecisionAsync(bool approve, string? rejectionReason, CancellationToken cancellationToken)
     {
-        if (!_activePairingId.HasValue)
+        Guid? pairingId = null;
+        bool isRemote = false;
+        string endpoint = string.Empty;
+        string? thumbprint = null;
+        var permissions = NexusPermission.ViewStatus;
+
+        await RunOnUiAsync(() =>
+        {
+            CancelPolling();
+            pairingId = _activePairingId;
+            if (!pairingId.HasValue)
+            {
+                return;
+            }
+
+            isRemote = _isRemoteMode;
+            endpoint = _endpointUsed;
+            thumbprint = _tlsThumbprint;
+            permissions = BuildGrantedPermissions();
+
+            CurrentState = PairingSessionState.Validating;
+            StatusMessage = approve ? "Confirmando estabelecimento de confiança..." : "Rejeitando solicitação de pareamento...";
+        }, cancellationToken).ConfigureAwait(false);
+
+        if (!pairingId.HasValue)
         {
             return;
         }
 
-        CancelPolling();
-        CurrentState = PairingSessionState.Validating;
-        StatusMessage = approve ? "Confirmando estabelecimento de confiança..." : "Rejeitando solicitação de pareamento...";
-
         var result = await _pairingClient.ConfirmPairingAsync(
-            _activePairingId.Value,
+            pairingId.Value,
             approve,
-            BuildGrantedPermissions(),
-            _isRemoteMode,
-            _endpointUsed,
-            _tlsThumbprint,
+            permissions,
+            isRemote,
+            endpoint,
+            thumbprint,
             rejectionReason,
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
 
         if (result.IsFailure)
         {
-            CurrentState = PairingSessionState.Failed;
-            StatusMessage = result.Error!.Message;
+            var errMsg = result.Error!.Message;
+            await RunOnUiAsync(() =>
+            {
+                CurrentState = PairingSessionState.Failed;
+                StatusMessage = errMsg;
+            }, cancellationToken).ConfigureAwait(false);
             return;
         }
 
-        ApplySnapshot(result.Value);
-        await _devicesViewModel.LoadTrustedDevicesAsync(cancellationToken);
-        await _devicesViewModel.LoadDevicesAsync(cancellationToken);
+        var snapshot = result.Value;
+        await RunOnUiAsync(() => ApplySnapshot(snapshot), cancellationToken).ConfigureAwait(false);
+        await _devicesViewModel.LoadTrustedDevicesAsync(cancellationToken).ConfigureAwait(false);
+        await _devicesViewModel.LoadDevicesAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private Task ResetAsync(CancellationToken cancellationToken)
     {
-        CancelPolling();
-        _activePairingId = null;
-        QrPngBytes = null;
-        QrPayloadJson = string.Empty;
-        CountdownText = "-";
-        ResetCandidateInfo();
-        CurrentState = PairingSessionState.Idle;
-        StatusMessage = "Pronto para iniciar novo pareamento seguro via QR Code.";
-        PollStatusCommand.NotifyCanExecuteChanged();
-        return Task.CompletedTask;
+        return RunOnUiAsync(() =>
+        {
+            CancelPolling();
+            _activePairingId = null;
+            QrPngBytes = null;
+            QrPayloadJson = string.Empty;
+            CountdownText = "-";
+            ResetCandidateInfo();
+            CurrentState = PairingSessionState.Idle;
+            StatusMessage = "Pronto para iniciar novo pareamento seguro via QR Code.";
+            PollStatusCommand.NotifyCanExecuteChanged();
+        }, cancellationToken);
     }
 
     private NexusPermission BuildGrantedPermissions()
@@ -351,41 +410,61 @@ public sealed class PairingViewModel : ObservableObject, IDisposable
 
     private void StartBackgroundPolling()
     {
-        _pollCts = new CancellationTokenSource();
-        var token = _pollCts.Token;
-        _ = RunPollLoopAsync(token);
+        var next = new CancellationTokenSource();
+        var prev = Interlocked.Exchange(ref _pollCts, next);
+        if (prev is not null)
+        {
+            prev.Cancel();
+            prev.Dispose();
+        }
+
+        _ = RunPollLoopAsync(next.Token);
     }
 
     private async Task RunPollLoopAsync(CancellationToken token)
     {
         try
         {
-            while (!token.IsCancellationRequested && CurrentState == PairingSessionState.AwaitingScan)
+            while (!token.IsCancellationRequested)
             {
-                UpdateCountdown();
-                await Task.Delay(TimeSpan.FromSeconds(1.2), token);
-                if (!token.IsCancellationRequested && _activePairingId.HasValue)
+                var shouldContinue = false;
+                await RunOnUiAsync(() =>
                 {
-                    await PollStatusOnceAsync(token);
+                    shouldContinue = CurrentState == PairingSessionState.AwaitingScan && _activePairingId.HasValue;
+                    if (shouldContinue)
+                    {
+                        UpdateCountdown();
+                    }
+                }, token).ConfigureAwait(false);
+
+                if (!shouldContinue)
+                {
+                    break;
+                }
+
+                await Task.Delay(TimeSpan.FromSeconds(1.2), token).ConfigureAwait(false);
+                if (!token.IsCancellationRequested)
+                {
+                    await PollStatusOnceAsync(token).ConfigureAwait(false);
                 }
             }
         }
         catch (OperationCanceledException)
         {
-            // Expected when pairing advances or resets
+            // Esperado ao concluir ou redefinir a sessão de pareamento.
         }
     }
 
     private void CancelPolling()
     {
-        if (_pollCts is null)
+        var cts = Interlocked.Exchange(ref _pollCts, null);
+        if (cts is null)
         {
             return;
         }
 
-        _pollCts.Cancel();
-        _pollCts.Dispose();
-        _pollCts = null;
+        cts.Cancel();
+        cts.Dispose();
     }
 
     public void Dispose()
@@ -393,4 +472,3 @@ public sealed class PairingViewModel : ObservableObject, IDisposable
         CancelPolling();
     }
 }
-

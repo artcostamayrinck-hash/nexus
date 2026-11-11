@@ -5,14 +5,15 @@ using Nexus.Desktop.Services.Mvvm;
 
 namespace Nexus.Desktop.Services.ViewModels;
 
-public sealed class SyncViewModel : ObservableObject
+public sealed class SyncViewModel : ObservableObject, IDisposable
 {
     private readonly IClipboardSyncService _clipboardService;
     private readonly INotesSyncService _notesService;
     private readonly ISyncOrchestrator _syncOrchestrator;
     private readonly ISyncPrivacySettingsService _privacyService;
     private readonly ISystemClipboardAdapter _clipboardAdapter;
-    private readonly SynchronizationContext? _uiContext;
+
+    private long _notesRefreshGeneration;
 
     private string _syncStatusText = "Ocioso";
     private string _lastSyncText = "Nunca sincronizado";
@@ -44,14 +45,15 @@ public sealed class SyncViewModel : ObservableObject
         INotesSyncService notesService,
         ISyncOrchestrator syncOrchestrator,
         ISyncPrivacySettingsService privacyService,
-        ISystemClipboardAdapter clipboardAdapter)
+        ISystemClipboardAdapter clipboardAdapter,
+        IUiDispatcher? uiDispatcher = null)
+        : base(uiDispatcher)
     {
         _clipboardService = clipboardService;
         _notesService = notesService;
         _syncOrchestrator = syncOrchestrator;
         _privacyService = privacyService;
         _clipboardAdapter = clipboardAdapter;
-        _uiContext = SynchronizationContext.Current;
         _platformCapabilityText = clipboardAdapter.PlatformRestrictionNotice;
 
         AvailablePolicies =
@@ -62,24 +64,24 @@ public sealed class SyncViewModel : ObservableObject
             ConflictResolutionPolicy.PreferRemote
         ];
 
-        SyncNowCommand = new AsyncRelayCommand(SyncNowAsync);
-        SavePreferencesCommand = new AsyncRelayCommand(SavePreferencesAsync);
-        SendClipboardTextCommand = new AsyncRelayCommand(SendClipboardTextAsync);
-        CaptureOsClipboardCommand = new AsyncRelayCommand(CaptureOsClipboardAsync);
-        CopyHistoryEntryCommand = new AsyncRelayCommand<ClipboardEntryContract>(CopyHistoryEntryAsync);
-        ClearClipboardHistoryCommand = new AsyncRelayCommand(ClearClipboardHistoryAsync);
-        SearchNotesCommand = new AsyncRelayCommand(RefreshNotesAndConflictsAsync);
-        NewNoteCommand = new RelayCommand(StartNewNote);
-        SaveNoteCommand = new AsyncRelayCommand(SaveNoteAsync);
-        DeleteSelectedNoteCommand = new AsyncRelayCommand(DeleteSelectedNoteAsync);
-        RestoreRevisionCommand = new AsyncRelayCommand<NoteRevisionSnapshot>(RestoreRevisionAsync);
-        KeepLocalConflictCommand = new AsyncRelayCommand(_ => ResolveSelectedConflictAsync(ConflictResolutionChoice.KeepLocal));
-        AcceptRemoteConflictCommand = new AsyncRelayCommand(_ => ResolveSelectedConflictAsync(ConflictResolutionChoice.AcceptRemote));
-        ManualMergeConflictCommand = new AsyncRelayCommand(_ => ResolveSelectedConflictAsync(ConflictResolutionChoice.ManualMerge));
+        SyncNowCommand = new AsyncRelayCommand(SyncNowAsync, uiDispatcher: uiDispatcher);
+        SavePreferencesCommand = new AsyncRelayCommand(SavePreferencesAsync, uiDispatcher: uiDispatcher);
+        SendClipboardTextCommand = new AsyncRelayCommand(SendClipboardTextAsync, uiDispatcher: uiDispatcher);
+        CaptureOsClipboardCommand = new AsyncRelayCommand(CaptureOsClipboardAsync, uiDispatcher: uiDispatcher);
+        CopyHistoryEntryCommand = new AsyncRelayCommand<ClipboardEntryContract>(CopyHistoryEntryAsync, uiDispatcher: uiDispatcher);
+        ClearClipboardHistoryCommand = new AsyncRelayCommand(ClearClipboardHistoryAsync, uiDispatcher: uiDispatcher);
+        SearchNotesCommand = new AsyncRelayCommand(RefreshNotesAndConflictsAsync, uiDispatcher: uiDispatcher);
+        NewNoteCommand = new RelayCommand(StartNewNote, uiDispatcher: uiDispatcher);
+        SaveNoteCommand = new AsyncRelayCommand(SaveNoteAsync, uiDispatcher: uiDispatcher);
+        DeleteSelectedNoteCommand = new AsyncRelayCommand(DeleteSelectedNoteAsync, uiDispatcher: uiDispatcher);
+        RestoreRevisionCommand = new AsyncRelayCommand<NoteRevisionSnapshot>(RestoreRevisionAsync, uiDispatcher: uiDispatcher);
+        KeepLocalConflictCommand = new AsyncRelayCommand(_ => ResolveSelectedConflictAsync(ConflictResolutionChoice.KeepLocal), uiDispatcher: uiDispatcher);
+        AcceptRemoteConflictCommand = new AsyncRelayCommand(_ => ResolveSelectedConflictAsync(ConflictResolutionChoice.AcceptRemote), uiDispatcher: uiDispatcher);
+        ManualMergeConflictCommand = new AsyncRelayCommand(_ => ResolveSelectedConflictAsync(ConflictResolutionChoice.ManualMerge), uiDispatcher: uiDispatcher);
 
-        _syncOrchestrator.OverviewChanged += (_, overview) => RunOnUi(() => ApplyOverview(overview));
-        _clipboardService.HistoryChanged += (_, history) => RunOnUi(() => ReplaceCollection(ClipboardHistory, history));
-        _notesService.NotesOrConflictsChanged += (_, _) => _ = RunOnUiAsync(RefreshNotesAndConflictsAsync);
+        _syncOrchestrator.OverviewChanged += OnOverviewChanged;
+        _clipboardService.HistoryChanged += OnClipboardHistoryChanged;
+        _notesService.NotesOrConflictsChanged += OnNotesOrConflictsChanged;
     }
 
     public ObservableCollection<ClipboardEntryContract> ClipboardHistory { get; } = new();
@@ -111,7 +113,7 @@ public sealed class SyncViewModel : ObservableObject
         {
             if (SetProperty(ref _searchQuery, value))
             {
-                _ = RefreshNotesAndConflictsAsync(CancellationToken.None);
+                _ = RefreshNotesAndConflictsSafelyAsync();
             }
         }
     }
@@ -130,7 +132,7 @@ public sealed class SyncViewModel : ObservableObject
                     EditorMetadataText =
                         $"v{value.Version} (base {value.BaseVersion}) · Criada: {value.CreatedAtUtc.ToLocalTime():g} · Alterada: {value.ModifiedAtUtc.ToLocalTime():g} por {value.LastModifiedByDeviceName}" +
                         (value.HasConflict ? " · EM CONFLITO" : string.Empty);
-                    _ = LoadRevisionsForNoteAsync(value.NoteId);
+                    _ = LoadRevisionsForNoteSafelyAsync(value.NoteId);
                 }
                 else
                 {
@@ -178,101 +180,123 @@ public sealed class SyncViewModel : ObservableObject
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         var prefsResult = await _privacyService.GetPreferencesAsync(cancellationToken).ConfigureAwait(false);
-        if (prefsResult.IsSuccess)
+        var initOverview = await _syncOrchestrator.InitializeAsync(cancellationToken).ConfigureAwait(false);
+        var history = await _clipboardService.GetHistoryAsync(cancellationToken).ConfigureAwait(false);
+
+        await RunOnUiAsync(() =>
         {
-            var prefs = prefsResult.Value;
-            RunOnUi(() =>
+            if (prefsResult.IsSuccess)
             {
+                var prefs = prefsResult.Value;
                 ClipboardSyncEnabled = prefs.ClipboardSyncEnabled;
                 ClipboardAutoSync = prefs.ClipboardAutoSync;
                 ClipboardMaxHistoryItems = prefs.ClipboardMaxHistoryItems;
                 NotesSyncEnabled = prefs.NotesSyncEnabled;
                 NotesAutoSync = prefs.NotesAutoSync;
                 SelectedConflictPolicy = prefs.DefaultNoteConflictPolicy;
-            });
-        }
+            }
 
-        var initOverview = await _syncOrchestrator.InitializeAsync(cancellationToken).ConfigureAwait(false);
-        if (initOverview.IsSuccess)
-        {
-            RunOnUi(() => ApplyOverview(initOverview.Value));
-        }
+            if (initOverview.IsSuccess)
+            {
+                ApplyOverview(initOverview.Value);
+            }
 
-        var history = await _clipboardService.GetHistoryAsync(cancellationToken).ConfigureAwait(false);
-        if (history.IsSuccess)
-        {
-            RunOnUi(() => ReplaceCollection(ClipboardHistory, history.Value));
-        }
+            if (history.IsSuccess)
+            {
+                ReplaceCollection(ClipboardHistory, history.Value);
+            }
+        }, cancellationToken).ConfigureAwait(false);
 
         await RefreshNotesAndConflictsAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private async Task SyncNowAsync(CancellationToken ct)
     {
-        StatusBanner = "Sincronizando alterações locais e fila offline...";
+        await RunOnUiAsync(
+            () => StatusBanner = "Sincronizando alterações locais e fila offline...",
+            ct).ConfigureAwait(false);
+
         var res = await _syncOrchestrator.SyncNowAsync(ct).ConfigureAwait(false);
-        if (res.IsSuccess)
+        if (res.IsFailure)
         {
-            RunOnUi(() => ApplyOverview(res.Value));
-            await RefreshNotesAndConflictsAsync(ct).ConfigureAwait(false);
-            var history = await _clipboardService.GetHistoryAsync(ct).ConfigureAwait(false);
-            if (history.IsSuccess)
+            var errMsg = $"Sincronização pendente/falha: {res.Error?.Message}";
+            await RunOnUiAsync(() => StatusBanner = errMsg, ct).ConfigureAwait(false);
+            return;
+        }
+
+        var overview = res.Value;
+        await RefreshNotesAndConflictsAsync(ct).ConfigureAwait(false);
+        var history = await _clipboardService.GetHistoryAsync(ct).ConfigureAwait(false);
+        var historySnapshot = history.IsSuccess ? history.Value : null;
+
+        await RunOnUiAsync(() =>
+        {
+            ApplyOverview(overview);
+            if (historySnapshot is not null)
             {
-                RunOnUi(() => ReplaceCollection(ClipboardHistory, history.Value));
+                ReplaceCollection(ClipboardHistory, historySnapshot);
             }
-            StatusBanner = res.Value.LastDiagnostic ?? "Sincronização concluída.";
-        }
-        else
-        {
-            StatusBanner = $"Sincronização pendente/falha: {res.Error?.Message}";
-        }
+
+            StatusBanner = overview.LastDiagnostic ?? "Sincronização concluída.";
+        }, ct).ConfigureAwait(false);
     }
 
     private async Task SavePreferencesAsync(CancellationToken ct)
     {
-        var updated = new SyncPrivacyPreferences
+        SyncPrivacyPreferences updated = new();
+        await RunOnUiAsync(() =>
         {
-            ClipboardSyncEnabled = ClipboardSyncEnabled,
-            ClipboardAutoSync = ClipboardAutoSync,
-            ClipboardMaxHistoryItems = Math.Clamp(ClipboardMaxHistoryItems, 1, 500),
-            NotesSyncEnabled = NotesSyncEnabled,
-            NotesAutoSync = NotesAutoSync,
-            DefaultNoteConflictPolicy = SelectedConflictPolicy
-        };
+            updated = new SyncPrivacyPreferences
+            {
+                ClipboardSyncEnabled = ClipboardSyncEnabled,
+                ClipboardAutoSync = ClipboardAutoSync,
+                ClipboardMaxHistoryItems = Math.Clamp(ClipboardMaxHistoryItems, 1, 500),
+                NotesSyncEnabled = NotesSyncEnabled,
+                NotesAutoSync = NotesAutoSync,
+                DefaultNoteConflictPolicy = SelectedConflictPolicy
+            };
+        }, ct).ConfigureAwait(false);
 
         var saved = await _privacyService.SavePreferencesAsync(updated, ct).ConfigureAwait(false);
-        StatusBanner = saved.IsSuccess
+        var msg = saved.IsSuccess
             ? "Preferências de privacidade e resolução de conflitos salvas."
             : $"Erro ao salvar preferências: {saved.Error?.Message}";
+
+        await RunOnUiAsync(() => StatusBanner = msg, ct).ConfigureAwait(false);
     }
 
     private async Task SendClipboardTextAsync(CancellationToken ct)
     {
-        var text = ClipboardInputText;
+        string text = string.Empty;
+        await RunOnUiAsync(() => text = ClipboardInputText, ct).ConfigureAwait(false);
+
         var res = await _clipboardService.CaptureAndSendTextAsync(text, manualTrigger: true, ct).ConfigureAwait(false);
         if (res.IsSuccess)
         {
-            RunOnUi(() => ClipboardInputText = string.Empty);
-            StatusBanner = $"Texto enviado ao Clipboard NEXUS ({res.Value.CapturedAtUtc.ToLocalTime():T}).";
+            var captured = res.Value;
+            await RunOnUiAsync(() =>
+            {
+                ClipboardInputText = string.Empty;
+                StatusBanner = $"Texto enviado ao Clipboard NEXUS ({captured.CapturedAtUtc.ToLocalTime():T}).";
+            }, ct).ConfigureAwait(false);
         }
         else
         {
-            StatusBanner = $"Clipboard: {res.Error?.Message}";
+            var errMsg = $"Clipboard: {res.Error?.Message}";
+            await RunOnUiAsync(() => StatusBanner = errMsg, ct).ConfigureAwait(false);
         }
     }
 
     private async Task CaptureOsClipboardAsync(CancellationToken ct)
     {
         var res = await _clipboardService.CaptureCurrentOsClipboardAsync(ct).ConfigureAwait(false);
-        if (res.IsFailure)
-        {
-            StatusBanner = $"Captura OS: {res.Error?.Message}";
-            return;
-        }
+        var msg = res.IsFailure
+            ? $"Captura OS: {res.Error?.Message}"
+            : res.Value is null
+                ? "Clipboard do Windows está vazio ou sem texto."
+                : "Conteúdo atual do Windows capturado e enfileirado para sincronização.";
 
-        StatusBanner = res.Value is null
-            ? "Clipboard do Windows está vazio ou sem texto."
-            : "Conteúdo atual do Windows capturado e enfileirado para sincronização.";
+        await RunOnUiAsync(() => StatusBanner = msg, ct).ConfigureAwait(false);
     }
 
     private async Task CopyHistoryEntryAsync(ClipboardEntryContract? entry, CancellationToken ct)
@@ -283,67 +307,94 @@ public sealed class SyncViewModel : ObservableObject
         }
 
         var write = await _clipboardAdapter.WriteTextAsync(entry.ContentText, ct).ConfigureAwait(false);
-        StatusBanner = write.IsSuccess
+        var msg = write.IsSuccess
             ? $"Copiado para a área de transferência local ({entry.OriginDeviceName})."
             : $"Falha ao copiar: {write.Error?.Message}";
+
+        await RunOnUiAsync(() => StatusBanner = msg, ct).ConfigureAwait(false);
     }
 
     private async Task ClearClipboardHistoryAsync(CancellationToken ct)
     {
         await _clipboardService.ClearHistoryAsync(ct).ConfigureAwait(false);
-        StatusBanner = "Histórico local de clipboard limpo.";
+        await RunOnUiAsync(() => StatusBanner = "Histórico local de clipboard limpo.", ct).ConfigureAwait(false);
     }
 
     private void StartNewNote()
     {
-        SelectedNote = null;
-        EditorTitle = string.Empty;
-        EditorBody = string.Empty;
-        EditorMetadataText = "Nova nota (será salva localmente e sincronizada conforme suas preferências).";
+        RunOnUi(() =>
+        {
+            SelectedNote = null;
+            EditorTitle = string.Empty;
+            EditorBody = string.Empty;
+            EditorMetadataText = "Nova nota (será salva localmente e sincronizada conforme suas preferências).";
+        });
     }
 
     private async Task SaveNoteAsync(CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(EditorTitle))
+        string title = string.Empty;
+        string body = string.Empty;
+        NexusNoteContract? selected = null;
+
+        await RunOnUiAsync(() =>
         {
-            StatusBanner = "Informe um título antes de salvar a nota.";
+            title = EditorTitle;
+            body = EditorBody;
+            selected = SelectedNote;
+        }, ct).ConfigureAwait(false);
+
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            await RunOnUiAsync(() => StatusBanner = "Informe um título antes de salvar a nota.", ct).ConfigureAwait(false);
             return;
         }
 
-        var res = SelectedNote is null
-            ? await _notesService.CreateNoteAsync(EditorTitle, EditorBody, ct).ConfigureAwait(false)
-            : await _notesService.UpdateNoteAsync(SelectedNote.NoteId, EditorTitle, EditorBody, ct).ConfigureAwait(false);
+        var res = selected is null
+            ? await _notesService.CreateNoteAsync(title, body, ct).ConfigureAwait(false)
+            : await _notesService.UpdateNoteAsync(selected.NoteId, title, body, ct).ConfigureAwait(false);
 
         if (res.IsFailure)
         {
-            StatusBanner = $"Erro ao salvar nota: {res.Error?.Message}";
+            var errMsg = $"Erro ao salvar nota: {res.Error?.Message}";
+            await RunOnUiAsync(() => StatusBanner = errMsg, ct).ConfigureAwait(false);
             return;
         }
 
+        var savedNote = res.Value;
         await RefreshNotesAndConflictsAsync(ct).ConfigureAwait(false);
-        RunOnUi(() => SelectedNote = Notes.FirstOrDefault(n => n.NoteId == res.Value.NoteId));
-        StatusBanner = $"Nota '{res.Value.Title}' salva (v{res.Value.Version}).";
+        await RunOnUiAsync(() =>
+        {
+            SelectedNote = Notes.FirstOrDefault(n => n.NoteId == savedNote.NoteId);
+            StatusBanner = $"Nota '{savedNote.Title}' salva (v{savedNote.Version}).";
+        }, ct).ConfigureAwait(false);
     }
 
     private async Task DeleteSelectedNoteAsync(CancellationToken ct)
     {
-        if (SelectedNote is null)
+        Guid? selectedId = null;
+        await RunOnUiAsync(() => selectedId = SelectedNote?.NoteId, ct).ConfigureAwait(false);
+
+        if (!selectedId.HasValue)
         {
-            StatusBanner = "Selecione uma nota para excluir.";
+            await RunOnUiAsync(() => StatusBanner = "Selecione uma nota para excluir.", ct).ConfigureAwait(false);
             return;
         }
 
-        var id = SelectedNote.NoteId;
-        var res = await _notesService.DeleteNoteAsync(id, ct).ConfigureAwait(false);
+        var res = await _notesService.DeleteNoteAsync(selectedId.Value, ct).ConfigureAwait(false);
         if (res.IsFailure)
         {
-            StatusBanner = $"Erro ao excluir: {res.Error?.Message}";
+            var errMsg = $"Erro ao excluir: {res.Error?.Message}";
+            await RunOnUiAsync(() => StatusBanner = errMsg, ct).ConfigureAwait(false);
             return;
         }
 
-        RunOnUi(StartNewNote);
+        var deleted = res.Value;
+        StartNewNote();
         await RefreshNotesAndConflictsAsync(ct).ConfigureAwait(false);
-        StatusBanner = $"Nota marcada como excluída (tombstone v{res.Value.Version}).";
+        await RunOnUiAsync(
+            () => StatusBanner = $"Nota marcada como excluída (tombstone v{deleted.Version}).",
+            ct).ConfigureAwait(false);
     }
 
     private async Task RestoreRevisionAsync(NoteRevisionSnapshot? revision, CancellationToken ct)
@@ -356,21 +407,36 @@ public sealed class SyncViewModel : ObservableObject
         var res = await _notesService.RestoreRevisionAsync(revision.NoteId, revision.RevisionId, ct).ConfigureAwait(false);
         if (res.IsFailure)
         {
-            StatusBanner = $"Erro ao restaurar versão: {res.Error?.Message}";
+            var errMsg = $"Erro ao restaurar versão: {res.Error?.Message}";
+            await RunOnUiAsync(() => StatusBanner = errMsg, ct).ConfigureAwait(false);
             return;
         }
 
+        var restored = res.Value;
         await RefreshNotesAndConflictsAsync(ct).ConfigureAwait(false);
-        RunOnUi(() => SelectedNote = Notes.FirstOrDefault(n => n.NoteId == res.Value.NoteId));
-        StatusBanner = $"Versão v{revision.Version} restaurada como v{res.Value.Version}.";
+        await RunOnUiAsync(() =>
+        {
+            SelectedNote = Notes.FirstOrDefault(n => n.NoteId == restored.NoteId);
+            StatusBanner = $"Versão v{revision.Version} restaurada como v{restored.Version}.";
+        }, ct).ConfigureAwait(false);
     }
 
     private async Task ResolveSelectedConflictAsync(ConflictResolutionChoice choice)
     {
-        var conflict = SelectedConflict ?? UnresolvedConflicts.FirstOrDefault();
+        SyncConflictRecord? conflict = null;
+        string mergedTitle = string.Empty;
+        string mergedBody = string.Empty;
+
+        await RunOnUiAsync(() =>
+        {
+            conflict = SelectedConflict ?? UnresolvedConflicts.FirstOrDefault();
+            mergedTitle = ConflictMergedTitle;
+            mergedBody = ConflictMergedBody;
+        }).ConfigureAwait(false);
+
         if (conflict is null)
         {
-            StatusBanner = "Nenhum conflito selecionado para resolver.";
+            await RunOnUiAsync(() => StatusBanner = "Nenhum conflito selecionado para resolver.").ConfigureAwait(false);
             return;
         }
 
@@ -378,28 +444,65 @@ public sealed class SyncViewModel : ObservableObject
         {
             ConflictId = conflict.ConflictId,
             Choice = choice,
-            MergedTitle = choice == ConflictResolutionChoice.ManualMerge ? ConflictMergedTitle : null,
-            MergedBody = choice == ConflictResolutionChoice.ManualMerge ? ConflictMergedBody : null
+            MergedTitle = choice == ConflictResolutionChoice.ManualMerge ? mergedTitle : null,
+            MergedBody = choice == ConflictResolutionChoice.ManualMerge ? mergedBody : null
         };
 
         var res = await _notesService.ResolveConflictAsync(request).ConfigureAwait(false);
         if (res.IsFailure)
         {
-            StatusBanner = $"Erro ao resolver conflito: {res.Error?.Message}";
+            var errMsg = $"Erro ao resolver conflito: {res.Error?.Message}";
+            await RunOnUiAsync(() => StatusBanner = errMsg).ConfigureAwait(false);
             return;
         }
 
+        var resolvedNote = res.Value;
         await RefreshNotesAndConflictsAsync(CancellationToken.None).ConfigureAwait(false);
-        StatusBanner = $"Conflito resolvido ({choice}) -> Nota v{res.Value.Version}.";
+        await RunOnUiAsync(
+            () => StatusBanner = $"Conflito resolvido ({choice}) -> Nota v{resolvedNote.Version}.").ConfigureAwait(false);
+    }
+
+    private async Task RefreshNotesAndConflictsSafelyAsync()
+    {
+        try
+        {
+            await RefreshNotesAndConflictsAsync(CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Ignorado durante cancelamento.
+        }
+    }
+
+    private async Task LoadRevisionsForNoteSafelyAsync(Guid noteId)
+    {
+        try
+        {
+            await LoadRevisionsForNoteAsync(noteId).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Ignorado durante cancelamento.
+        }
     }
 
     private async Task RefreshNotesAndConflictsAsync(CancellationToken ct)
     {
-        var notesRes = await _notesService.ListNotesAsync(SearchQuery, includeDeleted: false, ct).ConfigureAwait(false);
+        var generation = Interlocked.Increment(ref _notesRefreshGeneration);
+        var query = SearchQuery;
+
+        var notesRes = await _notesService.ListNotesAsync(query, includeDeleted: false, ct).ConfigureAwait(false);
         var conflictsRes = await _notesService.ListConflictsAsync(unresolvedOnly: true, ct).ConfigureAwait(false);
 
-        RunOnUi(() =>
+        Guid? selectedNoteToLoadRevs = null;
+
+        await RunOnUiAsync(() =>
         {
+            if (generation != Volatile.Read(ref _notesRefreshGeneration))
+            {
+                return;
+            }
+
             if (notesRes.IsSuccess)
             {
                 var currentId = SelectedNote?.NoteId;
@@ -411,7 +514,7 @@ public sealed class SyncViewModel : ObservableObject
                     {
                         _selectedNote = match;
                         OnPropertyChanged(nameof(SelectedNote));
-                        _ = LoadRevisionsForNoteAsync(match.NoteId);
+                        selectedNoteToLoadRevs = match.NoteId;
                     }
                 }
             }
@@ -424,17 +527,41 @@ public sealed class SyncViewModel : ObservableObject
                     SelectedConflict = UnresolvedConflicts.FirstOrDefault();
                 }
             }
-        });
-    }
+        }, ct).ConfigureAwait(false);
 
-    private async Task LoadRevisionsForNoteAsync(Guid noteId)
-    {
-        var revs = await _notesService.GetRevisionsAsync(noteId).ConfigureAwait(false);
-        if (revs.IsSuccess)
+        if (selectedNoteToLoadRevs.HasValue)
         {
-            RunOnUi(() => ReplaceCollection(SelectedNoteRevisions, revs.Value));
+            await LoadRevisionsForNoteAsync(selectedNoteToLoadRevs.Value, ct).ConfigureAwait(false);
         }
     }
+
+    private async Task LoadRevisionsForNoteAsync(Guid noteId, CancellationToken ct = default)
+    {
+        var revs = await _notesService.GetRevisionsAsync(noteId, ct).ConfigureAwait(false);
+        if (revs.IsSuccess)
+        {
+            var items = revs.Value;
+            await RunOnUiAsync(() =>
+            {
+                if (SelectedNote?.NoteId == noteId)
+                {
+                    ReplaceCollection(SelectedNoteRevisions, items);
+                }
+            }, ct).ConfigureAwait(false);
+        }
+    }
+
+    private void OnOverviewChanged(object? sender, SyncOverviewSnapshot overview)
+        => RunOnUi(() => ApplyOverview(overview));
+
+    private void OnClipboardHistoryChanged(object? sender, IReadOnlyList<ClipboardEntryContract> history)
+    {
+        var snapshot = history.ToArray();
+        RunOnUi(() => ReplaceCollection(ClipboardHistory, snapshot));
+    }
+
+    private void OnNotesOrConflictsChanged(object? sender, EventArgs e)
+        => _ = RefreshNotesAndConflictsSafelyAsync();
 
     private void ApplyOverview(SyncOverviewSnapshot overview)
     {
@@ -446,47 +573,10 @@ public sealed class SyncViewModel : ObservableObject
         ConflictsCountText = $"{overview.UnresolvedConflictsCount} conflito(s)";
     }
 
-    private void RunOnUi(Action action)
+    public void Dispose()
     {
-        if (_uiContext is not null && SynchronizationContext.Current != _uiContext)
-        {
-            _uiContext.Post(_ => action(), null);
-        }
-        else
-        {
-            action();
-        }
-    }
-
-    private Task RunOnUiAsync(Func<CancellationToken, Task> asyncAction)
-    {
-        if (_uiContext is not null && SynchronizationContext.Current != _uiContext)
-        {
-            var tcs = new TaskCompletionSource();
-            _uiContext.Post(async _ =>
-            {
-                try
-                {
-                    await asyncAction(CancellationToken.None);
-                    tcs.TrySetResult();
-                }
-                catch (Exception ex)
-                {
-                    tcs.TrySetException(ex);
-                }
-            }, null);
-            return tcs.Task;
-        }
-
-        return asyncAction(CancellationToken.None);
-    }
-
-    private static void ReplaceCollection<T>(ObservableCollection<T> target, IReadOnlyList<T> items)
-    {
-        target.Clear();
-        foreach (var item in items)
-        {
-            target.Add(item);
-        }
+        _syncOrchestrator.OverviewChanged -= OnOverviewChanged;
+        _clipboardService.HistoryChanged -= OnClipboardHistoryChanged;
+        _notesService.NotesOrConflictsChanged -= OnNotesOrConflictsChanged;
     }
 }

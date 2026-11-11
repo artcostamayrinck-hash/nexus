@@ -168,11 +168,11 @@
                     <StackPanel Grid.Row="0" Grid.Column="0">
                       <TextBlock Text="{Binding FileName}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="14" FontWeight="SemiBold" />
                       <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="11">
-                        <Run Text="{Binding DirectionDisplay}" />
+                        <Run Text="{Binding DirectionDisplay, Mode=OneWay}" />
                         <Run Text=" · Peer: " />
-                        <Run Text="{Binding PeerDeviceName}" />
+                        <Run Text="{Binding PeerDeviceName, Mode=OneWay}" />
                         <Run Text=" · " />
-                        <Run Text="{Binding StageDisplay}" />
+                        <Run Text="{Binding StageDisplay, Mode=OneWay}" />
                       </TextBlock>
                     </StackPanel>
 
@@ -241,11 +241,11 @@
                     <StackPanel>
                       <TextBlock Text="{Binding FileName}" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" />
                       <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="11">
-                        <Run Text="{Binding SizeDisplay}" />
+                        <Run Text="{Binding SizeDisplay, Mode=OneWay}" />
                         <Run Text=" · Origem: " />
-                        <Run Text="{Binding PeerDeviceName}" />
+                        <Run Text="{Binding PeerDeviceName, Mode=OneWay}" />
                         <Run Text=" · SHA: " />
-                        <Run Text="{Binding ChecksumShort}" />
+                        <Run Text="{Binding ChecksumShort, Mode=OneWay}" />
                       </TextBlock>
                       <TextBlock Text="{Binding LocalFilePath}" Foreground="{StaticResource TextMutedBrush}" FontSize="10" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
@@ -280,11 +280,11 @@
                         <TextBlock Text="{Binding FileName}" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                       </DockPanel>
                       <TextBlock Foreground="{StaticResource CyanAccentBrush}" FontSize="11">
-                        <Run Text="{Binding DirectionDisplay}" />
+                        <Run Text="{Binding DirectionDisplay, Mode=OneWay}" />
                         <Run Text=" · " />
-                        <Run Text="{Binding StageDisplay}" />
+                        <Run Text="{Binding StageDisplay, Mode=OneWay}" />
                         <Run Text=" · " />
-                        <Run Text="{Binding SizeDisplay}" />
+                        <Run Text="{Binding SizeDisplay, Mode=OneWay}" />
                       </TextBlock>
                       <TextBlock Text="{Binding FailureMessage}" Foreground="{StaticResource DangerBrush}" FontSize="11" TextWrapping="Wrap" />
                     </StackPanel>

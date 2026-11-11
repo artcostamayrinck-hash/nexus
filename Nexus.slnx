@@ -11,6 +11,7 @@
     <Project Path="src/Nexus.Server/Nexus.Server.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Nexus.Desktop.Tests/Nexus.Desktop.Tests.csproj" />
     <Project Path="tests/Nexus.IntegrationTests/Nexus.IntegrationTests.csproj" />
     <Project Path="tests/Nexus.SecurityTests/Nexus.SecurityTests.csproj" />
     <Project Path="tests/Nexus.UnitTests/Nexus.UnitTests.csproj" />

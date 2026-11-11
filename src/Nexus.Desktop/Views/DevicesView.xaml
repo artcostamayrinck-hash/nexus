@@ -85,15 +85,15 @@
                                FontSize="15"
                                FontWeight="SemiBold" />
                     <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,3,0,0">
-                      <Run Text="{Binding Device.Platform}" />
+                      <Run Text="{Binding Device.Platform, Mode=OneWay}" />
                       <Run Text=" · " />
-                      <Run Text="{Binding Device.DeviceType}" />
+                      <Run Text="{Binding Device.DeviceType, Mode=OneWay}" />
                       <Run Text=" · " />
-                      <Run Text="{Binding Device.OperatingSystemVersion}" />
+                      <Run Text="{Binding Device.OperatingSystemVersion, Mode=OneWay}" />
                     </TextBlock>
                     <TextBlock Foreground="{StaticResource TextMutedBrush}" FontFamily="Consolas" FontSize="11" Margin="0,4,0,0">
                       <Run Text="ID: " />
-                      <Run Text="{Binding Device.DeviceId}" />
+                      <Run Text="{Binding Device.DeviceId, Mode=OneWay}" />
                     </TextBlock>
                   </StackPanel>
                   <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">

@@ -17,6 +17,10 @@ public sealed class ModulesViewModel : ObservableObject, IDisposable
     private readonly IRealtimeClientChannel _realtimeClient;
     private readonly ILocalDeviceContext _localDevice;
 
+    private long _statusGeneration;
+    private long _monitorGeneration;
+    private long _notificationsGeneration;
+
     private string _statusMessage = "Módulos de integração prontos.";
     private bool _isControlEnabled = true;
     private bool _requirePowerConfirmation = true;
@@ -58,7 +62,9 @@ public sealed class ModulesViewModel : ObservableObject, IDisposable
         IWindowsMediaService mediaService,
         INexusNotifyService notifyService,
         IRealtimeClientChannel realtimeClient,
-        ILocalDeviceContext localDevice)
+        ILocalDeviceContext localDevice,
+        IUiDispatcher? uiDispatcher = null)
+        : base(uiDispatcher)
     {
         _settingsService = settingsService;
         _controlExecutor = controlExecutor;
@@ -68,27 +74,27 @@ public sealed class ModulesViewModel : ObservableObject, IDisposable
         _realtimeClient = realtimeClient;
         _localDevice = localDevice;
 
-        RefreshAllCommand = new AsyncRelayCommand(RefreshAllAsync);
-        ToggleControlCommand = new AsyncRelayCommand(ct => ToggleModuleAsync(IntegrationModuleKind.Control, IsControlEnabled, ct));
-        ToggleNotifyCommand = new AsyncRelayCommand(ct => ToggleModuleAsync(IntegrationModuleKind.Notify, IsNotifyEnabled, ct));
-        ToggleMonitorCommand = new AsyncRelayCommand(ct => ToggleModuleAsync(IntegrationModuleKind.Monitor, IsMonitorEnabled, ct));
-        ToggleMediaCommand = new AsyncRelayCommand(ct => ToggleModuleAsync(IntegrationModuleKind.Media, IsMediaEnabled, ct));
-        SaveControlSettingsCommand = new AsyncRelayCommand(SaveControlSettingsAsync);
-        SaveNotifySettingsCommand = new AsyncRelayCommand(SaveNotifySettingsAsync);
-        AddHotkeyCommand = new AsyncRelayCommand(AddHotkeyAsync);
-        RemoveHotkeyCommand = new AsyncRelayCommand<RemoteHotkeyDefinition>(RemoveHotkeyAsync);
-        ExecuteHotkeyCommand = new AsyncRelayCommand<RemoteHotkeyDefinition>(ExecuteHotkeyAsync);
-        DismissNotificationCommand = new AsyncRelayCommand<MobileNotificationRecord>(DismissNotificationAsync);
-        ClearNotificationsCommand = new AsyncRelayCommand(ClearNotificationsAsync);
-        RefreshMonitorCommand = new AsyncRelayCommand(RefreshMonitorAsync);
-        MediaPlayPauseCommand = new AsyncRelayCommand(ct => ExecuteMediaActionAsync(MediaControlAction.PlayPause, null, ct));
-        MediaNextCommand = new AsyncRelayCommand(ct => ExecuteMediaActionAsync(MediaControlAction.Next, null, ct));
-        MediaPreviousCommand = new AsyncRelayCommand(ct => ExecuteMediaActionAsync(MediaControlAction.Previous, null, ct));
-        MediaStopCommand = new AsyncRelayCommand(ct => ExecuteMediaActionAsync(MediaControlAction.Stop, null, ct));
-        VolumeUpCommand = new AsyncRelayCommand(ct => ExecuteMediaActionAsync(MediaControlAction.VolumeUp, null, ct));
-        VolumeDownCommand = new AsyncRelayCommand(ct => ExecuteMediaActionAsync(MediaControlAction.VolumeDown, null, ct));
-        ToggleMuteCommand = new AsyncRelayCommand(ct => ExecuteMediaActionAsync(MediaControlAction.ToggleMute, null, ct));
-        ApplyVolumeCommand = new AsyncRelayCommand(ct => ExecuteMediaActionAsync(MediaControlAction.SetVolume, TargetVolumePercent, ct));
+        RefreshAllCommand = new AsyncRelayCommand(RefreshAllAsync, uiDispatcher: uiDispatcher);
+        ToggleControlCommand = new AsyncRelayCommand(ct => ToggleModuleAsync(IntegrationModuleKind.Control, IsControlEnabled, ct), uiDispatcher: uiDispatcher);
+        ToggleNotifyCommand = new AsyncRelayCommand(ct => ToggleModuleAsync(IntegrationModuleKind.Notify, IsNotifyEnabled, ct), uiDispatcher: uiDispatcher);
+        ToggleMonitorCommand = new AsyncRelayCommand(ct => ToggleModuleAsync(IntegrationModuleKind.Monitor, IsMonitorEnabled, ct), uiDispatcher: uiDispatcher);
+        ToggleMediaCommand = new AsyncRelayCommand(ct => ToggleModuleAsync(IntegrationModuleKind.Media, IsMediaEnabled, ct), uiDispatcher: uiDispatcher);
+        SaveControlSettingsCommand = new AsyncRelayCommand(SaveControlSettingsAsync, uiDispatcher: uiDispatcher);
+        SaveNotifySettingsCommand = new AsyncRelayCommand(SaveNotifySettingsAsync, uiDispatcher: uiDispatcher);
+        AddHotkeyCommand = new AsyncRelayCommand(AddHotkeyAsync, uiDispatcher: uiDispatcher);
+        RemoveHotkeyCommand = new AsyncRelayCommand<RemoteHotkeyDefinition>(RemoveHotkeyAsync, uiDispatcher: uiDispatcher);
+        ExecuteHotkeyCommand = new AsyncRelayCommand<RemoteHotkeyDefinition>(ExecuteHotkeyAsync, uiDispatcher: uiDispatcher);
+        DismissNotificationCommand = new AsyncRelayCommand<MobileNotificationRecord>(DismissNotificationAsync, uiDispatcher: uiDispatcher);
+        ClearNotificationsCommand = new AsyncRelayCommand(ClearNotificationsAsync, uiDispatcher: uiDispatcher);
+        RefreshMonitorCommand = new AsyncRelayCommand(RefreshMonitorAsync, uiDispatcher: uiDispatcher);
+        MediaPlayPauseCommand = new AsyncRelayCommand(ct => ExecuteMediaActionAsync(MediaControlAction.PlayPause, null, ct), uiDispatcher: uiDispatcher);
+        MediaNextCommand = new AsyncRelayCommand(ct => ExecuteMediaActionAsync(MediaControlAction.Next, null, ct), uiDispatcher: uiDispatcher);
+        MediaPreviousCommand = new AsyncRelayCommand(ct => ExecuteMediaActionAsync(MediaControlAction.Previous, null, ct), uiDispatcher: uiDispatcher);
+        MediaStopCommand = new AsyncRelayCommand(ct => ExecuteMediaActionAsync(MediaControlAction.Stop, null, ct), uiDispatcher: uiDispatcher);
+        VolumeUpCommand = new AsyncRelayCommand(ct => ExecuteMediaActionAsync(MediaControlAction.VolumeUp, null, ct), uiDispatcher: uiDispatcher);
+        VolumeDownCommand = new AsyncRelayCommand(ct => ExecuteMediaActionAsync(MediaControlAction.VolumeDown, null, ct), uiDispatcher: uiDispatcher);
+        ToggleMuteCommand = new AsyncRelayCommand(ct => ExecuteMediaActionAsync(MediaControlAction.ToggleMute, null, ct), uiDispatcher: uiDispatcher);
+        ApplyVolumeCommand = new AsyncRelayCommand(ct => ExecuteMediaActionAsync(MediaControlAction.SetVolume, TargetVolumePercent, ct), uiDispatcher: uiDispatcher);
 
         _notifyService.NotificationReceived += OnLocalNotificationReceived;
         _realtimeClient.MobileNotificationReceived += OnRealtimeNotificationReceived;
@@ -170,65 +176,74 @@ public sealed class ModulesViewModel : ObservableObject, IDisposable
         await RefreshNotificationsAsync(cancellationToken).ConfigureAwait(false);
         await RefreshMonitorAsync(cancellationToken).ConfigureAwait(false);
         await RefreshMediaAsync(cancellationToken).ConfigureAwait(false);
-        StatusMessage = $"Módulos atualizados ({ModuleStatuses.Count} integrações).";
+        await RunOnUiAsync(
+            () => StatusMessage = $"Módulos atualizados ({ModuleStatuses.Count} integrações).",
+            cancellationToken).ConfigureAwait(false);
     }
 
     private async Task RefreshStatusesAndSettingsAsync(CancellationToken ct)
     {
+        var generation = Interlocked.Increment(ref _statusGeneration);
+
         var statusesRes = await _settingsService.GetModuleStatusesAsync(ct).ConfigureAwait(false);
-        if (statusesRes.IsSuccess)
-        {
-            ModuleStatuses.Clear();
-            foreach (var status in statusesRes.Value)
-            {
-                ModuleStatuses.Add(status);
-            }
-        }
-
         var controlRes = await _settingsService.GetControlSettingsAsync(ct).ConfigureAwait(false);
-        if (controlRes.IsSuccess)
-        {
-            IsControlEnabled = controlRes.Value.IsEnabled;
-            RequirePowerConfirmation = controlRes.Value.RequirePowerActionConfirmation;
-            AllowPowerActions = controlRes.Value.AllowPowerActions;
-            Hotkeys.Clear();
-            foreach (var hk in controlRes.Value.Hotkeys)
-            {
-                Hotkeys.Add(hk);
-            }
-        }
-
         var notifyRes = await _settingsService.GetNotifySettingsAsync(ct).ConfigureAwait(false);
-        if (notifyRes.IsSuccess)
-        {
-            IsNotifyEnabled = notifyRes.Value.IsEnabled;
-            NotifyFilterMode = notifyRes.Value.FilterMode;
-            AllowedAppsText = string.Join(", ", notifyRes.Value.AllowedApps);
-            BlockedAppsText = string.Join(", ", notifyRes.Value.BlockedApps);
-            AndroidNotifyNote = notifyRes.Value.AndroidPermission.PlatformNote;
-        }
-
         var monitorRes = await _settingsService.GetMonitorSettingsAsync(ct).ConfigureAwait(false);
-        if (monitorRes.IsSuccess)
-        {
-            IsMonitorEnabled = monitorRes.Value.IsEnabled;
-            MonitorRefreshSeconds = monitorRes.Value.RefreshIntervalSeconds;
-        }
-
         var mediaRes = await _settingsService.GetMediaSettingsAsync(ct).ConfigureAwait(false);
-        if (mediaRes.IsSuccess)
+
+        await RunOnUiAsync(() =>
         {
-            IsMediaEnabled = mediaRes.Value.IsEnabled;
-        }
+            if (generation != Volatile.Read(ref _statusGeneration))
+            {
+                return;
+            }
+
+            if (statusesRes.IsSuccess)
+            {
+                ReplaceCollection(ModuleStatuses, statusesRes.Value);
+            }
+
+            if (controlRes.IsSuccess)
+            {
+                IsControlEnabled = controlRes.Value.IsEnabled;
+                RequirePowerConfirmation = controlRes.Value.RequirePowerActionConfirmation;
+                AllowPowerActions = controlRes.Value.AllowPowerActions;
+                ReplaceCollection(Hotkeys, controlRes.Value.Hotkeys);
+            }
+
+            if (notifyRes.IsSuccess)
+            {
+                IsNotifyEnabled = notifyRes.Value.IsEnabled;
+                NotifyFilterMode = notifyRes.Value.FilterMode;
+                AllowedAppsText = string.Join(", ", notifyRes.Value.AllowedApps);
+                BlockedAppsText = string.Join(", ", notifyRes.Value.BlockedApps);
+                AndroidNotifyNote = notifyRes.Value.AndroidPermission.PlatformNote;
+            }
+
+            if (monitorRes.IsSuccess)
+            {
+                IsMonitorEnabled = monitorRes.Value.IsEnabled;
+                MonitorRefreshSeconds = monitorRes.Value.RefreshIntervalSeconds;
+            }
+
+            if (mediaRes.IsSuccess)
+            {
+                IsMediaEnabled = mediaRes.Value.IsEnabled;
+            }
+        }, ct).ConfigureAwait(false);
     }
 
     private async Task ToggleModuleAsync(IntegrationModuleKind kind, bool isEnabled, CancellationToken ct)
     {
-        var req = new UpdateModuleToggleRequest(kind, isEnabled, kind == IntegrationModuleKind.Control ? RequirePowerConfirmation : null);
+        bool requireConfirm = false;
+        await RunOnUiAsync(() => requireConfirm = RequirePowerConfirmation, ct).ConfigureAwait(false);
+
+        var req = new UpdateModuleToggleRequest(kind, isEnabled, kind == IntegrationModuleKind.Control ? requireConfirm : null);
         var res = await _settingsService.SetModuleEnabledAsync(req, ct).ConfigureAwait(false);
         if (res.IsFailure)
         {
-            StatusMessage = res.Error!.Message;
+            var errMsg = res.Error!.Message;
+            await RunOnUiAsync(() => StatusMessage = errMsg, ct).ConfigureAwait(false);
             return;
         }
 
@@ -242,59 +257,93 @@ public sealed class ModulesViewModel : ObservableObject, IDisposable
             await RefreshMediaAsync(ct).ConfigureAwait(false);
         }
 
-        StatusMessage = $"{res.Value.DisplayName}: {(res.Value.IsEnabled ? "ativado" : "desativado")}.";
+        var toggleMsg = $"{res.Value.DisplayName}: {(res.Value.IsEnabled ? "ativado" : "desativado")}.";
+        await RunOnUiAsync(() => StatusMessage = toggleMsg, ct).ConfigureAwait(false);
     }
 
     public async Task SaveControlSettingsAsync(CancellationToken ct = default)
     {
+        bool enabled = true;
+        bool reqConfirm = true;
+        bool allowPower = true;
+        RemoteHotkeyDefinition[] hotkeysSnapshot = Array.Empty<RemoteHotkeyDefinition>();
+
+        await RunOnUiAsync(() =>
+        {
+            enabled = IsControlEnabled;
+            reqConfirm = RequirePowerConfirmation;
+            allowPower = AllowPowerActions;
+            hotkeysSnapshot = Hotkeys.ToArray();
+        }, ct).ConfigureAwait(false);
+
         var current = await _settingsService.GetControlSettingsAsync(ct).ConfigureAwait(false);
         var baseSettings = current.IsSuccess ? current.Value : new ControlModuleSettings();
         var updated = baseSettings with
         {
-            IsEnabled = IsControlEnabled,
-            RequirePowerActionConfirmation = RequirePowerConfirmation,
-            AllowPowerActions = AllowPowerActions,
-            Hotkeys = Hotkeys.ToArray()
+            IsEnabled = enabled,
+            RequirePowerActionConfirmation = reqConfirm,
+            AllowPowerActions = allowPower,
+            Hotkeys = hotkeysSnapshot
         };
 
         var saved = await _settingsService.SaveControlSettingsAsync(updated, ct).ConfigureAwait(false);
-        StatusMessage = saved.IsSuccess
+        var msg = saved.IsSuccess
             ? "Configurações do Nexus Control salvas."
             : saved.Error!.Message;
+
+        await RunOnUiAsync(() => StatusMessage = msg, ct).ConfigureAwait(false);
         await RefreshStatusesAndSettingsAsync(ct).ConfigureAwait(false);
     }
 
     public async Task AddHotkeyAsync(CancellationToken ct = default)
     {
-        var keys = ParseCsvOrPlus(NewHotkeyKeys);
-        if (string.IsNullOrWhiteSpace(NewHotkeyName) || keys.Length == 0)
+        string rawKeys = string.Empty;
+        string rawName = string.Empty;
+        string rawId = string.Empty;
+
+        await RunOnUiAsync(() =>
         {
-            ControlFeedback = "Informe nome e teclas (ex.: Ctrl+Alt+N).";
+            rawKeys = NewHotkeyKeys;
+            rawName = NewHotkeyName;
+            rawId = NewHotkeyId;
+        }, ct).ConfigureAwait(false);
+
+        var keys = ParseCsvOrPlus(rawKeys);
+        if (string.IsNullOrWhiteSpace(rawName) || keys.Length == 0)
+        {
+            await RunOnUiAsync(
+                () => ControlFeedback = "Informe nome e teclas (ex.: Ctrl+Alt+N).",
+                ct).ConfigureAwait(false);
             return;
         }
 
-        var id = string.IsNullOrWhiteSpace(NewHotkeyId)
-            ? NewHotkeyName.Trim().ToLowerInvariant().Replace(' ', '-')
-            : NewHotkeyId.Trim();
+        var id = string.IsNullOrWhiteSpace(rawId)
+            ? rawName.Trim().ToLowerInvariant().Replace(' ', '-')
+            : rawId.Trim();
 
-        Hotkeys.Add(new RemoteHotkeyDefinition
+        var hotkey = new RemoteHotkeyDefinition
         {
             HotkeyId = id,
-            DisplayName = NewHotkeyName.Trim(),
+            DisplayName = rawName.Trim(),
             Keys = keys,
             Description = $"Atalho personalizado ({string.Join("+", keys)})"
-        });
+        };
 
-        NewHotkeyId = string.Empty;
-        NewHotkeyName = string.Empty;
+        await RunOnUiAsync(() =>
+        {
+            Hotkeys.Add(hotkey);
+            NewHotkeyId = string.Empty;
+            NewHotkeyName = string.Empty;
+        }, ct).ConfigureAwait(false);
+
         await SaveControlSettingsAsync(ct).ConfigureAwait(false);
-        ControlFeedback = $"Atalho '{id}' adicionado.";
+        await RunOnUiAsync(() => ControlFeedback = $"Atalho '{id}' adicionado.", ct).ConfigureAwait(false);
     }
 
     private async Task RemoveHotkeyAsync(RemoteHotkeyDefinition? hotkey, CancellationToken ct)
     {
         if (hotkey is null) return;
-        Hotkeys.Remove(hotkey);
+        await RunOnUiAsync(() => Hotkeys.Remove(hotkey), ct).ConfigureAwait(false);
         await SaveControlSettingsAsync(ct).ConfigureAwait(false);
     }
 
@@ -309,40 +358,58 @@ public sealed class ModulesViewModel : ObservableObject, IDisposable
             Keys = hotkey.Keys
         }, ct).ConfigureAwait(false);
 
-        ControlFeedback = res.IsSuccess
-            ? res.Value.Message
-            : res.Error!.Message;
+        var feedback = res.IsSuccess ? res.Value.Message : res.Error!.Message;
+        await RunOnUiAsync(() => ControlFeedback = feedback, ct).ConfigureAwait(false);
     }
 
     public async Task SaveNotifySettingsAsync(CancellationToken ct = default)
     {
+        bool enabled = true;
+        NotificationFilterMode mode = NotificationFilterMode.AllowAll;
+        string allowedRaw = string.Empty;
+        string blockedRaw = string.Empty;
+
+        await RunOnUiAsync(() =>
+        {
+            enabled = IsNotifyEnabled;
+            mode = NotifyFilterMode;
+            allowedRaw = AllowedAppsText;
+            blockedRaw = BlockedAppsText;
+        }, ct).ConfigureAwait(false);
+
         var current = await _settingsService.GetNotifySettingsAsync(ct).ConfigureAwait(false);
         var baseSettings = current.IsSuccess ? current.Value : new NotifyModuleSettings();
         var updated = baseSettings with
         {
-            IsEnabled = IsNotifyEnabled,
-            FilterMode = NotifyFilterMode,
-            AllowedApps = ParseCsvApps(AllowedAppsText),
-            BlockedApps = ParseCsvApps(BlockedAppsText)
+            IsEnabled = enabled,
+            FilterMode = mode,
+            AllowedApps = ParseCsvApps(allowedRaw),
+            BlockedApps = ParseCsvApps(blockedRaw)
         };
 
         var saved = await _settingsService.SaveNotifySettingsAsync(updated, ct).ConfigureAwait(false);
-        StatusMessage = saved.IsSuccess
+        var msg = saved.IsSuccess
             ? "Preferências de filtro do Nexus Notify salvas."
             : saved.Error!.Message;
+
+        await RunOnUiAsync(() => StatusMessage = msg, ct).ConfigureAwait(false);
         await RefreshStatusesAndSettingsAsync(ct).ConfigureAwait(false);
     }
 
     public async Task RefreshNotificationsAsync(CancellationToken ct = default)
     {
+        var generation = Interlocked.Increment(ref _notificationsGeneration);
         var res = await _notifyService.ListHistoryAsync(80, ct).ConfigureAwait(false);
         if (res.IsSuccess)
         {
-            NotificationFeed.Clear();
-            foreach (var n in res.Value)
+            var items = res.Value;
+            await RunOnUiAsync(() =>
             {
-                NotificationFeed.Add(n);
-            }
+                if (generation == Volatile.Read(ref _notificationsGeneration))
+                {
+                    ReplaceCollection(NotificationFeed, items);
+                }
+            }, ct).ConfigureAwait(false);
         }
     }
 
@@ -361,55 +428,74 @@ public sealed class ModulesViewModel : ObservableObject, IDisposable
         var res = await _notifyService.ClearHistoryAsync(ct).ConfigureAwait(false);
         if (res.IsSuccess)
         {
-            NotificationFeed.Clear();
-            StatusMessage = $"{res.Value} notificação(ões) removidas do histórico.";
+            var count = res.Value;
+            await RunOnUiAsync(() =>
+            {
+                NotificationFeed.Clear();
+                StatusMessage = $"{count} notificação(ões) removidas do histórico.";
+            }, ct).ConfigureAwait(false);
         }
     }
 
     public async Task RefreshMonitorAsync(CancellationToken ct = default)
     {
+        var generation = Interlocked.Increment(ref _monitorGeneration);
         var snapRes = await _hostMonitor.CollectSnapshotAsync(ct).ConfigureAwait(false);
         if (snapRes.IsFailure)
         {
-            CpuUsageText = "Desativado";
-            MemorySummaryText = snapRes.Error!.Message;
-            Disks.Clear();
-            NetworkInterfaces.Clear();
-            TopProcesses.Clear();
+            var errMsg = snapRes.Error!.Message;
+            await RunOnUiAsync(() =>
+            {
+                if (generation != Volatile.Read(ref _monitorGeneration))
+                {
+                    return;
+                }
+
+                CpuUsageText = "Desativado";
+                MemorySummaryText = errMsg;
+                Disks.Clear();
+                NetworkInterfaces.Clear();
+                TopProcesses.Clear();
+            }, ct).ConfigureAwait(false);
             return;
         }
 
         var s = snapRes.Value;
-        CpuNameText = s.Cpu.ProcessorName;
         var clockSuffix = s.Cpu.NominalClockMhz.IsAvailable ? $" · {s.Cpu.NominalClockMhz.Value} MHz" : string.Empty;
-        CpuUsageText = s.Cpu.UsagePercent.IsAvailable
+        var cpuUsage = s.Cpu.UsagePercent.IsAvailable
             ? $"{s.Cpu.UsagePercent.Value:F1}% ({s.Cpu.LogicalCores} threads{clockSuffix})"
             : $"Indisponível ({s.Cpu.UsagePercent.StatusMessage})";
-
-        MemorySummaryText = s.Memory.UsagePercent.IsAvailable
+        var memSummary = s.Memory.UsagePercent.IsAvailable
             ? $"{s.Memory.UsagePercent.Value:F1}% · {s.Memory.UsedMb.Value:F0} / {s.Memory.TotalMb.Value:F0} MB"
             : s.Memory.UsagePercent.StatusMessage;
-
-        GpuSummaryText = s.Gpu.IsAvailable
+        var gpuSummary = s.Gpu.IsAvailable
             ? (s.Gpu.AdapterRamMb.IsAvailable ? $"{s.Gpu.AdapterName} ({s.Gpu.AdapterRamMb.Value:F0} MB VRAM)" : s.Gpu.AdapterName)
             : "Indisponível";
-        GpuAvailabilityNote = s.Gpu.StatusMessage;
-
-        TemperatureSummaryText = s.Temperatures.IsAvailable
+        var tempSummary = s.Temperatures.IsAvailable
             ? $"{s.Temperatures.PrimaryCelsius.Value:F1} °C"
             : "Indisponível no hardware/SO atual";
-        TemperatureStatusNote = s.Temperatures.StatusMessage;
+        var uptimeText = $"Tempo ativo: {(int)s.Uptime.TotalHours}h {s.Uptime.Minutes}m · {s.OsDescription}";
 
-        UptimeText = $"Tempo ativo: {(int)s.Uptime.TotalHours}h {s.Uptime.Minutes}m · {s.OsDescription}";
+        await RunOnUiAsync(() =>
+        {
+            if (generation != Volatile.Read(ref _monitorGeneration))
+            {
+                return;
+            }
 
-        Disks.Clear();
-        foreach (var d in s.Disks) Disks.Add(d);
+            CpuNameText = s.Cpu.ProcessorName;
+            CpuUsageText = cpuUsage;
+            MemorySummaryText = memSummary;
+            GpuSummaryText = gpuSummary;
+            GpuAvailabilityNote = s.Gpu.StatusMessage;
+            TemperatureSummaryText = tempSummary;
+            TemperatureStatusNote = s.Temperatures.StatusMessage;
+            UptimeText = uptimeText;
 
-        NetworkInterfaces.Clear();
-        foreach (var nic in s.NetworkInterfaces) NetworkInterfaces.Add(nic);
-
-        TopProcesses.Clear();
-        foreach (var p in s.TopProcesses) TopProcesses.Add(p);
+            ReplaceCollection(Disks, s.Disks);
+            ReplaceCollection(NetworkInterfaces, s.NetworkInterfaces);
+            ReplaceCollection(TopProcesses, s.TopProcesses);
+        }, ct).ConfigureAwait(false);
     }
 
     public async Task RefreshMediaAsync(CancellationToken ct = default)
@@ -417,14 +503,19 @@ public sealed class ModulesViewModel : ObservableObject, IDisposable
         var res = await _mediaService.GetCurrentStateAsync(ct).ConfigureAwait(false);
         if (res.IsFailure)
         {
-            MediaPlaybackBadge = "Desativado";
-            MediaVolumeText = "--";
-            MediaMuteBadge = "--";
-            MediaMetadataNote = res.Error!.Message;
+            var errMsg = res.Error!.Message;
+            await RunOnUiAsync(() =>
+            {
+                MediaPlaybackBadge = "Desativado";
+                MediaVolumeText = "--";
+                MediaMuteBadge = "--";
+                MediaMetadataNote = errMsg;
+            }, ct).ConfigureAwait(false);
             return;
         }
 
-        ApplyMediaState(res.Value);
+        var state = res.Value;
+        await RunOnUiAsync(() => ApplyMediaState(state), ct).ConfigureAwait(false);
     }
 
     private async Task ExecuteMediaActionAsync(MediaControlAction action, int? volumePercent, CancellationToken ct)
@@ -438,12 +529,17 @@ public sealed class ModulesViewModel : ObservableObject, IDisposable
 
         if (res.IsFailure)
         {
-            StatusMessage = res.Error!.Message;
+            var errMsg = res.Error!.Message;
+            await RunOnUiAsync(() => StatusMessage = errMsg, ct).ConfigureAwait(false);
             return;
         }
 
-        ApplyMediaState(res.Value);
-        StatusMessage = $"Mídia: comando {action} executado.";
+        var state = res.Value;
+        await RunOnUiAsync(() =>
+        {
+            ApplyMediaState(state);
+            StatusMessage = $"Mídia: comando {action} executado.";
+        }, ct).ConfigureAwait(false);
     }
 
     private void ApplyMediaState(MediaPlaybackStateContract state)
@@ -471,29 +567,40 @@ public sealed class ModulesViewModel : ObservableObject, IDisposable
 
     private void OnLocalNotificationReceived(object? sender, MobileNotificationRecord record)
     {
-        NotificationFeed.Insert(0, record);
-        while (NotificationFeed.Count > 100) NotificationFeed.RemoveAt(NotificationFeed.Count - 1);
+        RunOnUi(() =>
+        {
+            if (!NotificationFeed.Any(n => n.NotificationId == record.NotificationId))
+            {
+                PrependCapped(NotificationFeed, record, 100);
+            }
+        });
     }
 
     private void OnRealtimeNotificationReceived(object? sender, MobileNotificationRecord record)
     {
-        if (!NotificationFeed.Any(n => n.NotificationId == record.NotificationId))
+        RunOnUi(() =>
         {
-            NotificationFeed.Insert(0, record);
-        }
+            if (!NotificationFeed.Any(n => n.NotificationId == record.NotificationId))
+            {
+                PrependCapped(NotificationFeed, record, 100);
+            }
+        });
     }
 
     private void OnRealtimeMediaStateReceived(object? sender, MediaPlaybackStateContract state)
-        => ApplyMediaState(state);
+        => RunOnUi(() => ApplyMediaState(state));
 
     private void OnRealtimeModuleStatusChanged(object? sender, IntegrationModuleStatusSnapshot status)
     {
-        var existing = ModuleStatuses.FirstOrDefault(s => s.ModuleKind == status.ModuleKind);
-        if (existing is not null)
+        RunOnUi(() =>
         {
-            var idx = ModuleStatuses.IndexOf(existing);
-            ModuleStatuses[idx] = status;
-        }
+            var existing = ModuleStatuses.FirstOrDefault(s => s.ModuleKind == status.ModuleKind);
+            if (existing is not null)
+            {
+                var idx = ModuleStatuses.IndexOf(existing);
+                ModuleStatuses[idx] = status;
+            }
+        });
     }
 
     private static string[] ParseCsvApps(string? text)
@@ -514,4 +621,3 @@ public sealed class ModulesViewModel : ObservableObject, IDisposable
         _realtimeClient.ModuleStatusChangedReceived -= OnRealtimeModuleStatusChanged;
     }
 }
-

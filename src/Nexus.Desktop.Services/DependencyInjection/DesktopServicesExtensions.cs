@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Nexus.Desktop.Services.Connectivity;
+using Nexus.Desktop.Services.Mvvm;
 using Nexus.Desktop.Services.Security;
 using Nexus.Desktop.Services.Settings;
 using Nexus.Desktop.Services.ViewModels;
@@ -12,6 +13,7 @@ public static class DesktopServicesExtensions
     public static IServiceCollection AddNexusDesktopServices(this IServiceCollection services)
     {
         services.AddHttpClient("NexusProbe");
+        services.TryAddSingleton<IUiDispatcher>(ImmediateUiDispatcher.Instance);
         services.TryAddSingleton<IDesktopSettingsService, DesktopSettingsService>();
         services.TryAddSingleton<IServerHealthProbeService, ServerHealthProbeService>();
         services.TryAddSingleton<IDesktopPairingClient, DesktopPairingClient>();

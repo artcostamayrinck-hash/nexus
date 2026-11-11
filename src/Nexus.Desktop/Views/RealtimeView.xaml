@@ -92,9 +92,9 @@
                       <StackPanel DockPanel.Dock="Left">
                         <TextBlock Text="{Binding DeviceName}" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="13" />
                         <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="11">
-                          <Run Text="{Binding Platform}" />
+                          <Run Text="{Binding Platform, Mode=OneWay}" />
                           <Run Text=" · " />
-                          <Run Text="{Binding ConnectionState}" />
+                          <Run Text="{Binding ConnectionState, Mode=OneWay}" />
                         </TextBlock>
                       </StackPanel>
                       <TextBlock DockPanel.Dock="Right"

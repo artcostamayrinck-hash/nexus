@@ -9,13 +9,12 @@ using Nexus.Desktop.Services.Mvvm;
 
 namespace Nexus.Desktop.Services.ViewModels;
 
-public sealed class TransferViewModel : ObservableObject
+public sealed class TransferViewModel : ObservableObject, IDisposable
 {
     private readonly ITransferManager _transferManager;
     private readonly ITransferStorageProvider _storageProvider;
     private readonly ITrustedDeviceRepository _trustedDeviceRepository;
     private readonly ILocalDeviceContext _localDevice;
-    private readonly SynchronizationContext? _uiContext;
 
     private TrustedDeviceRecord? _selectedPeer;
     private TransferDuplicatePolicy _selectedDuplicatePolicy = TransferDuplicatePolicy.Rename;
@@ -31,13 +30,14 @@ public sealed class TransferViewModel : ObservableObject
         ITransferManager transferManager,
         ITransferStorageProvider storageProvider,
         ITrustedDeviceRepository trustedDeviceRepository,
-        ILocalDeviceContext localDevice)
+        ILocalDeviceContext localDevice,
+        IUiDispatcher? uiDispatcher = null)
+        : base(uiDispatcher)
     {
         _transferManager = transferManager;
         _storageProvider = storageProvider;
         _trustedDeviceRepository = trustedDeviceRepository;
         _localDevice = localDevice;
-        _uiContext = SynchronizationContext.Current;
 
         DuplicatePolicies =
         [
@@ -46,38 +46,38 @@ public sealed class TransferViewModel : ObservableObject
             TransferDuplicatePolicy.Skip
         ];
 
-        SendSelectedFilesCommand = new AsyncRelayCommand(SendSelectedFilesAsync, () => SelectedPeer is not null && PendingSelectedFiles.Count > 0);
-        ClearPendingFilesCommand = new RelayCommand(ClearPendingFiles);
-        RemovePendingFileCommand = new AsyncRelayCommand<string>((path, _) =>
+        SendSelectedFilesCommand = new AsyncRelayCommand(SendSelectedFilesAsync, () => SelectedPeer is not null && PendingSelectedFiles.Count > 0, uiDispatcher: uiDispatcher);
+        ClearPendingFilesCommand = new RelayCommand(ClearPendingFiles, uiDispatcher: uiDispatcher);
+        RemovePendingFileCommand = new AsyncRelayCommand<string>((path, ct) =>
         {
-            if (!string.IsNullOrWhiteSpace(path))
+            if (string.IsNullOrWhiteSpace(path))
             {
-                RunOnUi(() =>
-                {
-                    PendingSelectedFiles.Remove(path);
-                    SendSelectedFilesCommand.NotifyCanExecuteChanged();
-                });
+                return Task.CompletedTask;
             }
 
-            return Task.CompletedTask;
-        });
+            return RunOnUiAsync(() =>
+            {
+                PendingSelectedFiles.Remove(path);
+                SendSelectedFilesCommand.NotifyCanExecuteChanged();
+            }, ct);
+        }, uiDispatcher: uiDispatcher);
 
         PauseTransferCommand = new AsyncRelayCommand<TransferDisplayItem>((item, ct) =>
-            item is null ? Task.CompletedTask : ExecuteControlAsync(() => _transferManager.PauseTransferAsync(item.TransferId, ct)));
+            item is null ? Task.CompletedTask : ExecuteControlAsync(() => _transferManager.PauseTransferAsync(item.TransferId, ct), ct), uiDispatcher: uiDispatcher);
 
         ResumeTransferCommand = new AsyncRelayCommand<TransferDisplayItem>((item, ct) =>
-            item is null ? Task.CompletedTask : ExecuteControlAsync(() => _transferManager.ResumeTransferAsync(item.TransferId, ct)));
+            item is null ? Task.CompletedTask : ExecuteControlAsync(() => _transferManager.ResumeTransferAsync(item.TransferId, ct), ct), uiDispatcher: uiDispatcher);
 
         CancelTransferCommand = new AsyncRelayCommand<TransferDisplayItem>((item, ct) =>
-            item is null ? Task.CompletedTask : ExecuteControlAsync(() => _transferManager.CancelTransferAsync(item.TransferId, null, ct)));
+            item is null ? Task.CompletedTask : ExecuteControlAsync(() => _transferManager.CancelTransferAsync(item.TransferId, null, ct), ct), uiDispatcher: uiDispatcher);
 
-        ResumeInterruptedCommand = new AsyncRelayCommand(ResumeInterruptedAsync);
-        SyncIncomingCommand = new AsyncRelayCommand(SyncIncomingAsync);
-        ApplyQueueConfigCommand = new AsyncRelayCommand(ApplyQueueConfigAsync);
-        ClearHistoryCommand = new AsyncRelayCommand(ClearHistoryAsync);
-        RefreshCommand = new AsyncRelayCommand(RefreshAsync);
+        ResumeInterruptedCommand = new AsyncRelayCommand(ResumeInterruptedAsync, uiDispatcher: uiDispatcher);
+        SyncIncomingCommand = new AsyncRelayCommand(SyncIncomingAsync, uiDispatcher: uiDispatcher);
+        ApplyQueueConfigCommand = new AsyncRelayCommand(ApplyQueueConfigAsync, uiDispatcher: uiDispatcher);
+        ClearHistoryCommand = new AsyncRelayCommand(ClearHistoryAsync, uiDispatcher: uiDispatcher);
+        RefreshCommand = new AsyncRelayCommand(RefreshAsync, uiDispatcher: uiDispatcher);
 
-        _transferManager.TransferUpdated += (_, _) => RunOnUi(ReloadCollectionsFromManager);
+        _transferManager.TransferUpdated += OnTransferUpdated;
     }
 
     public ObservableCollection<string> PendingSelectedFiles { get; } = [];
@@ -145,10 +145,15 @@ public sealed class TransferViewModel : ObservableObject
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         await _transferManager.InitializeAsync(cancellationToken).ConfigureAwait(false);
-        MaxConcurrentTransfers = _transferManager.Options.MaxConcurrentTransfers;
-        SelectedDuplicatePolicy = _transferManager.Options.DefaultDuplicatePolicy;
-        AutoDownloadIncoming = _transferManager.Options.AutoDownloadIncoming;
-        AutoResumeOnReconnect = _transferManager.Options.AutoResumeOnReconnect;
+        var opts = _transferManager.Options;
+
+        await RunOnUiAsync(() =>
+        {
+            MaxConcurrentTransfers = opts.MaxConcurrentTransfers;
+            SelectedDuplicatePolicy = opts.DefaultDuplicatePolicy;
+            AutoDownloadIncoming = opts.AutoDownloadIncoming;
+            AutoResumeOnReconnect = opts.AutoResumeOnReconnect;
+        }, cancellationToken).ConfigureAwait(false);
 
         await RefreshAsync(cancellationToken).ConfigureAwait(false);
     }
@@ -156,19 +161,19 @@ public sealed class TransferViewModel : ObservableObject
     public void AddSelectedFiles(IEnumerable<string> filePaths)
     {
         ArgumentNullException.ThrowIfNull(filePaths);
+        var normalized = filePaths
+            .Where(raw => !string.IsNullOrWhiteSpace(raw))
+            .Select(Path.GetFullPath)
+            .Where(File.Exists)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
 
         RunOnUi(() =>
         {
             var added = 0;
-            foreach (var raw in filePaths)
+            foreach (var full in normalized)
             {
-                if (string.IsNullOrWhiteSpace(raw))
-                {
-                    continue;
-                }
-
-                var full = Path.GetFullPath(raw);
-                if (File.Exists(full) && !PendingSelectedFiles.Contains(full, StringComparer.OrdinalIgnoreCase))
+                if (!PendingSelectedFiles.Contains(full, StringComparer.OrdinalIgnoreCase))
                 {
                     PendingSelectedFiles.Add(full);
                     added++;
@@ -189,53 +194,62 @@ public sealed class TransferViewModel : ObservableObject
         var peersResult = await _trustedDeviceRepository.ListAuthorizedAsync(cancellationToken).ConfigureAwait(false);
         await _transferManager.GetAllTransfersAsync(cancellationToken).ConfigureAwait(false);
 
-        RunOnUi(() =>
+        var peers = peersResult.IsSuccess
+            ? peersResult.Value
+                .Where(d => d.DeviceId != _localDevice.DeviceId)
+                .OrderBy(d => d.CustomName, StringComparer.OrdinalIgnoreCase)
+                .ToArray()
+            : null;
+        var projection = BuildCollectionSnapshot();
+
+        await RunOnUiAsync(() =>
         {
-            if (peersResult.IsSuccess)
+            if (peers is not null)
             {
-                var peers = peersResult.Value
-                    .Where(d => d.DeviceId != _localDevice.DeviceId)
-                    .OrderBy(d => d.CustomName, StringComparer.OrdinalIgnoreCase)
-                    .ToArray();
-
                 var prevId = SelectedPeer?.DeviceId;
-                AuthorizedPeers.Clear();
-                foreach (var p in peers)
-                {
-                    AuthorizedPeers.Add(p);
-                }
-
+                ReplaceCollection(AuthorizedPeers, peers);
                 SelectedPeer = peers.FirstOrDefault(p => p.DeviceId == prevId) ?? peers.FirstOrDefault();
             }
 
-            ReloadCollectionsFromManager();
+            ApplyCollectionSnapshot(projection);
             SendSelectedFilesCommand.NotifyCanExecuteChanged();
-        });
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task SendSelectedFilesAsync(CancellationToken cancellationToken)
     {
-        if (SelectedPeer is null)
+        TrustedDeviceRecord? peer = null;
+        TransferDuplicatePolicy policy = TransferDuplicatePolicy.Rename;
+        string[] batch = Array.Empty<string>();
+
+        await RunOnUiAsync(() =>
         {
-            StatusMessage = "Selecione um dispositivo autorizado para enviar arquivos.";
+            peer = SelectedPeer;
+            policy = SelectedDuplicatePolicy;
+            batch = PendingSelectedFiles.ToArray();
+        }, cancellationToken).ConfigureAwait(false);
+
+        if (peer is null)
+        {
+            await RunOnUiAsync(() => StatusMessage = "Selecione um dispositivo autorizado para enviar arquivos.", cancellationToken).ConfigureAwait(false);
             return;
         }
 
-        if (PendingSelectedFiles.Count == 0)
+        if (batch.Length == 0)
         {
-            StatusMessage = "Adicione ao menos um arquivo antes de iniciar o envio.";
+            await RunOnUiAsync(() => StatusMessage = "Adicione ao menos um arquivo antes de iniciar o envio.", cancellationToken).ConfigureAwait(false);
             return;
         }
 
-        var batch = PendingSelectedFiles.ToArray();
         var result = await _transferManager.EnqueueSendFilesAsync(
-            SelectedPeer.DeviceId,
-            SelectedPeer.CustomName,
+            peer.DeviceId,
+            peer.CustomName,
             batch,
-            SelectedDuplicatePolicy,
+            policy,
             cancellationToken).ConfigureAwait(false);
 
-        RunOnUi(() =>
+        var projection = BuildCollectionSnapshot();
+        await RunOnUiAsync(() =>
         {
             if (result.IsFailure)
             {
@@ -245,83 +259,115 @@ public sealed class TransferViewModel : ObservableObject
 
             PendingSelectedFiles.Clear();
             SendSelectedFilesCommand.NotifyCanExecuteChanged();
-            ReloadCollectionsFromManager();
-            StatusMessage = $"{result.Value.Count} arquivo(s) adicionado(s) à fila de envio para {SelectedPeer.CustomName}.";
-        });
+            ApplyCollectionSnapshot(projection);
+            StatusMessage = $"{result.Value.Count} arquivo(s) adicionado(s) à fila de envio para {peer.CustomName}.";
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     private void ClearPendingFiles()
     {
-        PendingSelectedFiles.Clear();
-        SendSelectedFilesCommand.NotifyCanExecuteChanged();
-        StatusMessage = "Seleção de envio limpa.";
-    }
-
-    private async Task ExecuteControlAsync(Func<Task<Core.Errors.Result<FileTransferRecord>>> action)
-    {
-        var result = await action().ConfigureAwait(false);
         RunOnUi(() =>
         {
-            ReloadCollectionsFromManager();
-            StatusMessage = result.IsSuccess
-                ? $"Transferência '{result.Value.SafeFileName}': {TransferDisplayItem.FromRecord(result.Value).StageDisplay}."
-                : result.Error!.Message;
+            PendingSelectedFiles.Clear();
+            SendSelectedFilesCommand.NotifyCanExecuteChanged();
+            StatusMessage = "Seleção de envio limpa.";
         });
+    }
+
+    private async Task ExecuteControlAsync(Func<Task<Core.Errors.Result<FileTransferRecord>>> action, CancellationToken cancellationToken)
+    {
+        var result = await action().ConfigureAwait(false);
+        var projection = BuildCollectionSnapshot();
+        var msg = result.IsSuccess
+            ? $"Transferência '{result.Value.SafeFileName}': {TransferDisplayItem.FromRecord(result.Value).StageDisplay}."
+            : result.Error!.Message;
+
+        await RunOnUiAsync(() =>
+        {
+            ApplyCollectionSnapshot(projection);
+            StatusMessage = msg;
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task ResumeInterruptedAsync(CancellationToken cancellationToken)
     {
         var result = await _transferManager.ResumeInterruptedTransfersAsync(cancellationToken).ConfigureAwait(false);
-        RunOnUi(() =>
+        var projection = BuildCollectionSnapshot();
+        var msg = result.IsSuccess
+            ? $"{result.Value} transferência(s) interrompida(s) recolocada(s) na fila."
+            : result.Error!.Message;
+
+        await RunOnUiAsync(() =>
         {
-            ReloadCollectionsFromManager();
-            StatusMessage = result.IsSuccess
-                ? $"{result.Value} transferência(s) interrompida(s) recolocada(s) na fila."
-                : result.Error!.Message;
-        });
+            ApplyCollectionSnapshot(projection);
+            StatusMessage = msg;
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task SyncIncomingAsync(CancellationToken cancellationToken)
     {
         var result = await _transferManager.SyncIncomingTransfersAsync(cancellationToken).ConfigureAwait(false);
-        RunOnUi(() =>
+        var projection = BuildCollectionSnapshot();
+        var msg = result.IsSuccess
+            ? $"{result.Value} transferência(s) recebida(s) sincronizada(s) do servidor."
+            : result.Error!.Message;
+
+        await RunOnUiAsync(() =>
         {
-            ReloadCollectionsFromManager();
-            StatusMessage = result.IsSuccess
-                ? $"{result.Value} transferência(s) recebida(s) sincronizada(s) do servidor."
-                : result.Error!.Message;
-        });
+            ApplyCollectionSnapshot(projection);
+            StatusMessage = msg;
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task ApplyQueueConfigAsync(CancellationToken cancellationToken)
     {
-        var next = _transferManager.Options with
+        TransferQueueOptions next = _transferManager.Options;
+        await RunOnUiAsync(() =>
         {
-            MaxConcurrentTransfers = MaxConcurrentTransfers,
-            DefaultDuplicatePolicy = SelectedDuplicatePolicy,
-            AutoDownloadIncoming = AutoDownloadIncoming,
-            AutoResumeOnReconnect = AutoResumeOnReconnect
-        };
+            next = _transferManager.Options with
+            {
+                MaxConcurrentTransfers = MaxConcurrentTransfers,
+                DefaultDuplicatePolicy = SelectedDuplicatePolicy,
+                AutoDownloadIncoming = AutoDownloadIncoming,
+                AutoResumeOnReconnect = AutoResumeOnReconnect
+            };
+        }, cancellationToken).ConfigureAwait(false);
 
         var result = await _transferManager.UpdateConfigurationAsync(next, cancellationToken).ConfigureAwait(false);
-        RunOnUi(() => StatusMessage = result.IsSuccess
+        var msg = result.IsSuccess
             ? $"Configuração salva: até {next.MaxConcurrentTransfers} transferência(s) simultânea(s), duplicados = {next.DefaultDuplicatePolicy}."
-            : result.Error!.Message);
+            : result.Error!.Message;
+
+        await RunOnUiAsync(() => StatusMessage = msg, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task ClearHistoryAsync(CancellationToken cancellationToken)
     {
         var result = await _transferManager.ClearHistoryAsync(cancellationToken).ConfigureAwait(false);
-        RunOnUi(() =>
+        var projection = BuildCollectionSnapshot();
+        var msg = result.IsSuccess
+            ? $"{result.Value} registro(s) concluído(s)/encerrado(s) removido(s) do histórico."
+            : result.Error!.Message;
+
+        await RunOnUiAsync(() =>
         {
-            ReloadCollectionsFromManager();
-            StatusMessage = result.IsSuccess
-                ? $"{result.Value} registro(s) concluído(s)/encerrado(s) removido(s) do histórico."
-                : result.Error!.Message;
-        });
+            ApplyCollectionSnapshot(projection);
+            StatusMessage = msg;
+        }, cancellationToken).ConfigureAwait(false);
     }
 
-    private void ReloadCollectionsFromManager()
+    private void OnTransferUpdated(object? sender, FileTransferRecord _)
+    {
+        var projection = BuildCollectionSnapshot();
+        RunOnUi(() => ApplyCollectionSnapshot(projection));
+    }
+
+    private sealed record TransferCollectionSnapshot(
+        TransferDisplayItem[] Active,
+        TransferDisplayItem[] Received,
+        TransferDisplayItem[] History);
+
+    private TransferCollectionSnapshot BuildCollectionSnapshot()
     {
         var all = _transferManager.History;
         var active = all
@@ -338,33 +384,22 @@ public sealed class TransferViewModel : ObservableObject
             .Select(TransferDisplayItem.FromRecord)
             .ToArray();
 
-        ReplaceCollection(ActiveTransfers, active);
-        ReplaceCollection(ReceivedFiles, received);
-        ReplaceCollection(HistoryItems, history);
-
-        ActiveCountText = $"{active.Length} em andamento";
-        ReceivedCountText = $"{received.Length} recebido(s)";
-        HistoryCountText = $"{history.Length} no histórico";
+        return new TransferCollectionSnapshot(active, received, history);
     }
 
-    private void RunOnUi(Action action)
+    private void ApplyCollectionSnapshot(TransferCollectionSnapshot snapshot)
     {
-        if (_uiContext is not null && SynchronizationContext.Current != _uiContext)
-        {
-            _uiContext.Post(_ => action(), null);
-        }
-        else
-        {
-            action();
-        }
+        ReplaceCollection(ActiveTransfers, snapshot.Active);
+        ReplaceCollection(ReceivedFiles, snapshot.Received);
+        ReplaceCollection(HistoryItems, snapshot.History);
+
+        ActiveCountText = $"{snapshot.Active.Length} em andamento";
+        ReceivedCountText = $"{snapshot.Received.Length} recebido(s)";
+        HistoryCountText = $"{snapshot.History.Length} no histórico";
     }
 
-    private static void ReplaceCollection<T>(ObservableCollection<T> target, IReadOnlyList<T> items)
+    public void Dispose()
     {
-        target.Clear();
-        foreach (var item in items)
-        {
-            target.Add(item);
-        }
+        _transferManager.TransferUpdated -= OnTransferUpdated;
     }
 }

@@ -109,11 +109,11 @@
               <DataTemplate>
                 <StackPanel Margin="4,3">
                   <TextBlock Foreground="{StaticResource CyanAccentBrush}" FontFamily="Consolas" FontSize="11">
-                    <Run Text="{Binding Timestamp, StringFormat={}{0:HH:mm:ss}}" />
+                    <Run Text="{Binding Timestamp, StringFormat={}{0:HH:mm:ss}, Mode=OneWay}" />
                     <Run Text=" [" />
-                    <Run Text="{Binding Level}" />
+                    <Run Text="{Binding Level, Mode=OneWay}" />
                     <Run Text="] " />
-                    <Run Text="{Binding SourceContext}" />
+                    <Run Text="{Binding SourceContext, Mode=OneWay}" />
                   </TextBlock>
                   <TextBlock Text="{Binding Message}" Foreground="{StaticResource TextPrimaryBrush}" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" />
                 </StackPanel>

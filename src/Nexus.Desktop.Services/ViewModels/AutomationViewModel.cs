@@ -15,7 +15,9 @@ public sealed class AutomationViewModel : ObservableObject, IDisposable
     private readonly IDeviceBatteryProvider _batteryProvider;
     private readonly IPanelAndAutomationClient _remoteClient;
     private readonly IRealtimeClientChannel _realtimeChannel;
-    private readonly SynchronizationContext? _uiContext = SynchronizationContext.Current;
+
+    private long _profileReloadGeneration;
+    private long _rulesReloadGeneration;
 
     private string _statusMessage = "Painel & Automações NEXUS prontos.";
     private string _hostBatterySummary = "Verificando bateria do computador...";
@@ -63,7 +65,9 @@ public sealed class AutomationViewModel : ObservableObject, IDisposable
         IAutomationEngine engine,
         IDeviceBatteryProvider batteryProvider,
         IPanelAndAutomationClient remoteClient,
-        IRealtimeClientChannel realtimeChannel)
+        IRealtimeClientChannel realtimeChannel,
+        IUiDispatcher? uiDispatcher = null)
+        : base(uiDispatcher)
     {
         _panelService = panelService;
         _engine = engine;
@@ -71,46 +75,35 @@ public sealed class AutomationViewModel : ObservableObject, IDisposable
         _remoteClient = remoteClient;
         _realtimeChannel = realtimeChannel;
 
-        InitializeCommand = new AsyncRelayCommand(InitializeAsync);
-        ToggleKillSwitchCommand = new AsyncRelayCommand(ToggleKillSwitchAsync);
-        ToggleGlobalAutomationsCommand = new AsyncRelayCommand(ToggleGlobalAutomationsAsync);
+        InitializeCommand = new AsyncRelayCommand(InitializeAsync, uiDispatcher: uiDispatcher);
+        ToggleKillSwitchCommand = new AsyncRelayCommand(ToggleKillSwitchAsync, uiDispatcher: uiDispatcher);
+        ToggleGlobalAutomationsCommand = new AsyncRelayCommand(ToggleGlobalAutomationsAsync, uiDispatcher: uiDispatcher);
 
-        CreateProfileCommand = new AsyncRelayCommand(CreateProfileAsync);
-        ActivateProfileCommand = new AsyncRelayCommand<PanelProfile>(ActivateProfileAsync);
-        DeleteProfileCommand = new AsyncRelayCommand<PanelProfile>(DeleteProfileAsync);
-        ApplyAppearanceCommand = new AsyncRelayCommand(ApplyAppearanceAsync);
-        AddWidgetCommand = new AsyncRelayCommand(AddWidgetAsync);
-        RemoveWidgetCommand = new AsyncRelayCommand<PanelWidgetItem>(RemoveWidgetAsync);
-        CycleWidgetSizeCommand = new AsyncRelayCommand<PanelWidgetItem>(CycleWidgetSizeAsync);
-        MoveWidgetUpCommand = new AsyncRelayCommand<PanelWidgetItem>((w, ct) => MoveWidgetRelativeAsync(w, -1, ct));
-        MoveWidgetDownCommand = new AsyncRelayCommand<PanelWidgetItem>((w, ct) => MoveWidgetRelativeAsync(w, 1, ct));
-        SyncPanelRemoteCommand = new AsyncRelayCommand(SyncPanelRemoteAsync);
+        CreateProfileCommand = new AsyncRelayCommand(CreateProfileAsync, uiDispatcher: uiDispatcher);
+        ActivateProfileCommand = new AsyncRelayCommand<PanelProfile>(ActivateProfileAsync, uiDispatcher: uiDispatcher);
+        DeleteProfileCommand = new AsyncRelayCommand<PanelProfile>(DeleteProfileAsync, uiDispatcher: uiDispatcher);
+        ApplyAppearanceCommand = new AsyncRelayCommand(ApplyAppearanceAsync, uiDispatcher: uiDispatcher);
+        AddWidgetCommand = new AsyncRelayCommand(AddWidgetAsync, uiDispatcher: uiDispatcher);
+        RemoveWidgetCommand = new AsyncRelayCommand<PanelWidgetItem>(RemoveWidgetAsync, uiDispatcher: uiDispatcher);
+        CycleWidgetSizeCommand = new AsyncRelayCommand<PanelWidgetItem>(CycleWidgetSizeAsync, uiDispatcher: uiDispatcher);
+        MoveWidgetUpCommand = new AsyncRelayCommand<PanelWidgetItem>((w, ct) => MoveWidgetRelativeAsync(w, -1, ct), uiDispatcher: uiDispatcher);
+        MoveWidgetDownCommand = new AsyncRelayCommand<PanelWidgetItem>((w, ct) => MoveWidgetRelativeAsync(w, 1, ct), uiDispatcher: uiDispatcher);
+        SyncPanelRemoteCommand = new AsyncRelayCommand(SyncPanelRemoteAsync, uiDispatcher: uiDispatcher);
 
-        AddApprovedAppCommand = new AsyncRelayCommand(AddApprovedAppAsync);
-        RemoveApprovedAppCommand = new AsyncRelayCommand<ApprovedAppShortcut>(RemoveApprovedAppAsync);
+        AddApprovedAppCommand = new AsyncRelayCommand(AddApprovedAppAsync, uiDispatcher: uiDispatcher);
+        RemoveApprovedAppCommand = new AsyncRelayCommand<ApprovedAppShortcut>(RemoveApprovedAppAsync, uiDispatcher: uiDispatcher);
 
-        SaveRuleCommand = new AsyncRelayCommand(SaveRuleAsync);
-        ClearRuleEditorCommand = new AsyncRelayCommand(_ =>
-        {
-            ResetRuleEditor();
-            return Task.CompletedTask;
-        });
-        EditRuleCommand = new AsyncRelayCommand<AutomationRule>((r, _) =>
-        {
-            if (r is not null) LoadRuleIntoEditor(r);
-            return Task.CompletedTask;
-        });
-        DuplicateRuleCommand = new AsyncRelayCommand<AutomationRule>(DuplicateRuleAsync);
-        ToggleRuleEnabledCommand = new AsyncRelayCommand<AutomationRule>(ToggleRuleEnabledAsync);
-        DeleteRuleCommand = new AsyncRelayCommand<AutomationRule>(DeleteRuleAsync);
-        TestRunRuleCommand = new AsyncRelayCommand<AutomationRule>(TestRunRuleAsync);
-        ConfirmSensitiveRuleCommand = new AsyncRelayCommand(ConfirmSensitiveRuleAsync);
-        CancelSensitivePromptCommand = new AsyncRelayCommand(_ =>
-        {
-            PendingSensitiveRule = null;
-            return Task.CompletedTask;
-        });
-        ClearHistoryCommand = new AsyncRelayCommand(ClearHistoryAsync);
+        SaveRuleCommand = new AsyncRelayCommand(SaveRuleAsync, uiDispatcher: uiDispatcher);
+        ClearRuleEditorCommand = new AsyncRelayCommand(ct => RunOnUiAsync(ResetRuleEditor, ct), uiDispatcher: uiDispatcher);
+        EditRuleCommand = new AsyncRelayCommand<AutomationRule>((r, ct) =>
+            r is null ? Task.CompletedTask : RunOnUiAsync(() => LoadRuleIntoEditor(r), ct), uiDispatcher: uiDispatcher);
+        DuplicateRuleCommand = new AsyncRelayCommand<AutomationRule>(DuplicateRuleAsync, uiDispatcher: uiDispatcher);
+        ToggleRuleEnabledCommand = new AsyncRelayCommand<AutomationRule>(ToggleRuleEnabledAsync, uiDispatcher: uiDispatcher);
+        DeleteRuleCommand = new AsyncRelayCommand<AutomationRule>(DeleteRuleAsync, uiDispatcher: uiDispatcher);
+        TestRunRuleCommand = new AsyncRelayCommand<AutomationRule>(TestRunRuleAsync, uiDispatcher: uiDispatcher);
+        ConfirmSensitiveRuleCommand = new AsyncRelayCommand(ConfirmSensitiveRuleAsync, uiDispatcher: uiDispatcher);
+        CancelSensitivePromptCommand = new AsyncRelayCommand(ct => RunOnUiAsync(() => PendingSensitiveRule = null, ct), uiDispatcher: uiDispatcher);
+        ClearHistoryCommand = new AsyncRelayCommand(ClearHistoryAsync, uiDispatcher: uiDispatcher);
 
         _panelService.ActiveProfileChanged += OnActiveProfileChanged;
         _engine.ExecutionLogged += OnExecutionLogged;
@@ -220,35 +213,44 @@ public sealed class AutomationViewModel : ObservableObject, IDisposable
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         var battery = await _batteryProvider.ReadBatteryStateAsync(cancellationToken).ConfigureAwait(false);
-        HostBatterySummary = battery.StatusMessage;
-
         var settingsRes = await _engine.GetSettingsAsync(cancellationToken).ConfigureAwait(false);
-        if (settingsRes.IsSuccess)
+        var indicatorsSnapshot = _engine.ActiveIndicators.ToArray();
+
+        await RunOnUiAsync(() =>
         {
-            ApplySettings(settingsRes.Value);
-        }
+            HostBatterySummary = battery.StatusMessage;
+            if (settingsRes.IsSuccess)
+            {
+                ApplySettings(settingsRes.Value);
+            }
+
+            ReplaceCollection(ActiveIndicators, indicatorsSnapshot);
+        }, cancellationToken).ConfigureAwait(false);
 
         await ReloadPanelProfilesAsync(cancellationToken).ConfigureAwait(false);
         await ReloadRulesAndHistoryAsync(cancellationToken).ConfigureAwait(false);
 
-        ActiveIndicators.Clear();
-        foreach (var ind in _engine.ActiveIndicators)
-        {
-            ActiveIndicators.Add(ind);
-        }
-
-        StatusMessage = $"Painel '{ActiveProfileName}' carregado · {Rules.Count} regra(s) de automação.";
+        await RunOnUiAsync(
+            () => StatusMessage = $"Painel '{ActiveProfileName}' carregado · {Rules.Count} regra(s) de automação.",
+            cancellationToken).ConfigureAwait(false);
     }
 
     private async Task ToggleKillSwitchAsync(CancellationToken cancellationToken)
     {
-        var res = await _engine.SetEmergencyKillSwitchAsync(!IsKillSwitchActive, cancellationToken).ConfigureAwait(false);
+        bool currentKillSwitch = false;
+        await RunOnUiAsync(() => currentKillSwitch = IsKillSwitchActive, cancellationToken).ConfigureAwait(false);
+
+        var res = await _engine.SetEmergencyKillSwitchAsync(!currentKillSwitch, cancellationToken).ConfigureAwait(false);
         if (res.IsSuccess)
         {
-            ApplySettings(res.Value);
-            StatusMessage = res.Value.EmergencyKillSwitchActive
-                ? "Kill Switch de emergência ATIVADO — nenhuma automação será executada."
-                : "Kill Switch desativado.";
+            var settings = res.Value;
+            await RunOnUiAsync(() =>
+            {
+                ApplySettings(settings);
+                StatusMessage = settings.EmergencyKillSwitchActive
+                    ? "Kill Switch de emergência ATIVADO — nenhuma automação será executada."
+                    : "Kill Switch desativado.";
+            }, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -260,25 +262,43 @@ public sealed class AutomationViewModel : ObservableObject, IDisposable
         var res = await _engine.SaveSettingsAsync(cur.Value with { GlobalAutomationsEnabled = !cur.Value.GlobalAutomationsEnabled }, cancellationToken).ConfigureAwait(false);
         if (res.IsSuccess)
         {
-            ApplySettings(res.Value);
-            StatusMessage = res.Value.GlobalAutomationsEnabled ? "Automações globais ativadas." : "Automações globais desativadas.";
+            var settings = res.Value;
+            await RunOnUiAsync(() =>
+            {
+                ApplySettings(settings);
+                StatusMessage = settings.GlobalAutomationsEnabled ? "Automações globais ativadas." : "Automações globais desativadas.";
+            }, cancellationToken).ConfigureAwait(false);
         }
     }
 
     private async Task CreateProfileAsync(CancellationToken cancellationToken)
     {
-        var name = string.IsNullOrWhiteSpace(NewProfileName) ? $"Perfil {Profiles.Count + 1}" : NewProfileName.Trim();
-        var created = await _panelService.CreateProfileAsync(name, SelectedTheme, SelectedAccent, cancellationToken).ConfigureAwait(false);
+        string name = string.Empty;
+        PanelThemePreset theme = PanelThemePreset.MidnightNavy;
+        PanelAccentColor accent = PanelAccentColor.Cyan;
+
+        await RunOnUiAsync(() =>
+        {
+            name = string.IsNullOrWhiteSpace(NewProfileName) ? $"Perfil {Profiles.Count + 1}" : NewProfileName.Trim();
+            theme = SelectedTheme;
+            accent = SelectedAccent;
+        }, cancellationToken).ConfigureAwait(false);
+
+        var created = await _panelService.CreateProfileAsync(name, theme, accent, cancellationToken).ConfigureAwait(false);
         if (created.IsFailure)
         {
-            StatusMessage = created.Error!.Message;
+            var errMsg = created.Error!.Message;
+            await RunOnUiAsync(() => StatusMessage = errMsg, cancellationToken).ConfigureAwait(false);
             return;
         }
 
-        NewProfileName = string.Empty;
+        await RunOnUiAsync(() => NewProfileName = string.Empty, cancellationToken).ConfigureAwait(false);
         await _panelService.ActivateProfileAsync(created.Value.ProfileId, cancellationToken).ConfigureAwait(false);
         await ReloadPanelProfilesAsync(cancellationToken).ConfigureAwait(false);
-        StatusMessage = $"Perfil '{created.Value.Name}' criado e ativado.";
+
+        await RunOnUiAsync(
+            () => StatusMessage = $"Perfil '{created.Value.Name}' criado e ativado.",
+            cancellationToken).ConfigureAwait(false);
     }
 
     private async Task ActivateProfileAsync(PanelProfile? profile, CancellationToken cancellationToken)
@@ -287,12 +307,15 @@ public sealed class AutomationViewModel : ObservableObject, IDisposable
         var res = await _panelService.ActivateProfileAsync(profile.ProfileId, cancellationToken).ConfigureAwait(false);
         if (res.IsFailure)
         {
-            StatusMessage = res.Error!.Message;
+            var errMsg = res.Error!.Message;
+            await RunOnUiAsync(() => StatusMessage = errMsg, cancellationToken).ConfigureAwait(false);
             return;
         }
 
         await ReloadPanelProfilesAsync(cancellationToken).ConfigureAwait(false);
-        StatusMessage = $"Perfil '{res.Value.Name}' ativado e persistido.";
+        await RunOnUiAsync(
+            () => StatusMessage = $"Perfil '{res.Value.Name}' ativado e persistido.",
+            cancellationToken).ConfigureAwait(false);
     }
 
     private async Task DeleteProfileAsync(PanelProfile? profile, CancellationToken cancellationToken)
@@ -301,40 +324,74 @@ public sealed class AutomationViewModel : ObservableObject, IDisposable
         var res = await _panelService.DeleteProfileAsync(profile.ProfileId, cancellationToken).ConfigureAwait(false);
         if (res.IsFailure)
         {
-            StatusMessage = res.Error!.Message;
+            var errMsg = res.Error!.Message;
+            await RunOnUiAsync(() => StatusMessage = errMsg, cancellationToken).ConfigureAwait(false);
             return;
         }
 
         await ReloadPanelProfilesAsync(cancellationToken).ConfigureAwait(false);
-        StatusMessage = $"Perfil '{profile.Name}' removido.";
+        await RunOnUiAsync(
+            () => StatusMessage = $"Perfil '{profile.Name}' removido.",
+            cancellationToken).ConfigureAwait(false);
     }
 
     private async Task ApplyAppearanceAsync(CancellationToken cancellationToken)
     {
-        var res = await _panelService.UpdateAppearanceAsync(SelectedTheme, SelectedAccent, SelectedGridColumns, cancellationToken).ConfigureAwait(false);
+        PanelThemePreset theme = PanelThemePreset.MidnightNavy;
+        PanelAccentColor accent = PanelAccentColor.Cyan;
+        int cols = 2;
+
+        await RunOnUiAsync(() =>
+        {
+            theme = SelectedTheme;
+            accent = SelectedAccent;
+            cols = SelectedGridColumns;
+        }, cancellationToken).ConfigureAwait(false);
+
+        var res = await _panelService.UpdateAppearanceAsync(theme, accent, cols, cancellationToken).ConfigureAwait(false);
         if (res.IsFailure)
         {
-            StatusMessage = res.Error!.Message;
+            var errMsg = res.Error!.Message;
+            await RunOnUiAsync(() => StatusMessage = errMsg, cancellationToken).ConfigureAwait(false);
             return;
         }
 
-        ApplyActiveProfile(res.Value);
-        StatusMessage = $"Aparência salva ({SelectedTheme} · {SelectedAccent} · {SelectedGridColumns} col.).";
+        var updatedProfile = res.Value;
+        await RunOnUiAsync(() =>
+        {
+            ApplyActiveProfile(updatedProfile);
+            StatusMessage = $"Aparência salva ({theme} · {accent} · {cols} col.).";
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task AddWidgetAsync(CancellationToken cancellationToken)
     {
-        var title = string.IsNullOrWhiteSpace(NewWidgetTitle) ? null : NewWidgetTitle.Trim();
-        var res = await _panelService.AddWidgetAsync(SelectedWidgetToAdd, title, SelectedWidgetSize, cancellationToken).ConfigureAwait(false);
+        string? title = null;
+        PanelWidgetType widgetType = PanelWidgetType.ConnectionStatus;
+        PanelWidgetSize widgetSize = PanelWidgetSize.Compact1x1;
+
+        await RunOnUiAsync(() =>
+        {
+            title = string.IsNullOrWhiteSpace(NewWidgetTitle) ? null : NewWidgetTitle.Trim();
+            widgetType = SelectedWidgetToAdd;
+            widgetSize = SelectedWidgetSize;
+        }, cancellationToken).ConfigureAwait(false);
+
+        var res = await _panelService.AddWidgetAsync(widgetType, title, widgetSize, cancellationToken).ConfigureAwait(false);
         if (res.IsFailure)
         {
-            StatusMessage = res.Error!.Message;
+            var errMsg = res.Error!.Message;
+            await RunOnUiAsync(() => StatusMessage = errMsg, cancellationToken).ConfigureAwait(false);
             return;
         }
 
-        NewWidgetTitle = string.Empty;
-        ApplyActiveProfile(res.Value);
-        StatusMessage = $"Widget '{SelectedWidgetToAdd}' adicionado ao painel.";
+        var updatedProfile = res.Value;
+        await RunOnUiAsync(() =>
+        {
+            NewWidgetTitle = string.Empty;
+            ApplyActiveProfile(updatedProfile);
+            StatusMessage = $"Widget '{widgetType}' adicionado ao painel.";
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task RemoveWidgetAsync(PanelWidgetItem? item, CancellationToken cancellationToken)
@@ -343,8 +400,12 @@ public sealed class AutomationViewModel : ObservableObject, IDisposable
         var res = await _panelService.RemoveWidgetAsync(item.WidgetId, cancellationToken).ConfigureAwait(false);
         if (res.IsSuccess)
         {
-            ApplyActiveProfile(res.Value);
-            StatusMessage = $"Widget '{item.Title}' removido.";
+            var updatedProfile = res.Value;
+            await RunOnUiAsync(() =>
+            {
+                ApplyActiveProfile(updatedProfile);
+                StatusMessage = $"Widget '{item.Title}' removido.";
+            }, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -362,54 +423,90 @@ public sealed class AutomationViewModel : ObservableObject, IDisposable
         var res = await _panelService.ResizeWidgetAsync(item.WidgetId, next, cancellationToken).ConfigureAwait(false);
         if (res.IsSuccess)
         {
-            ApplyActiveProfile(res.Value);
-            StatusMessage = $"Widget '{item.Title}' alterado para {next}.";
+            var updatedProfile = res.Value;
+            await RunOnUiAsync(() =>
+            {
+                ApplyActiveProfile(updatedProfile);
+                StatusMessage = $"Widget '{item.Title}' alterado para {next}.";
+            }, cancellationToken).ConfigureAwait(false);
         }
     }
 
     private async Task MoveWidgetRelativeAsync(PanelWidgetItem? item, int delta, CancellationToken cancellationToken)
     {
         if (item is null) return;
-        var idx = ActiveWidgets.IndexOf(item);
-        if (idx < 0) return;
 
-        var target = Math.Clamp(idx + delta, 0, Math.Max(0, ActiveWidgets.Count - 1));
-        if (target == idx) return;
+        int target = -1;
+        await RunOnUiAsync(() =>
+        {
+            var idx = ActiveWidgets.IndexOf(item);
+            if (idx < 0) return;
+
+            var candidate = Math.Clamp(idx + delta, 0, Math.Max(0, ActiveWidgets.Count - 1));
+            if (candidate != idx)
+            {
+                target = candidate;
+            }
+        }, cancellationToken).ConfigureAwait(false);
+
+        if (target < 0) return;
 
         var res = await _panelService.MoveWidgetAsync(item.WidgetId, target, cancellationToken).ConfigureAwait(false);
         if (res.IsSuccess)
         {
-            ApplyActiveProfile(res.Value);
-            StatusMessage = $"Widget '{item.Title}' movido para posição {target + 1}.";
+            var updatedProfile = res.Value;
+            await RunOnUiAsync(() =>
+            {
+                ApplyActiveProfile(updatedProfile);
+                StatusMessage = $"Widget '{item.Title}' movido para posição {target + 1}.";
+            }, cancellationToken).ConfigureAwait(false);
         }
     }
 
     private async Task SyncPanelRemoteAsync(CancellationToken cancellationToken)
     {
-        if (_activeProfile is null) return;
-        var res = await _remoteClient.SaveRemoteProfileAsync(_activeProfile, cancellationToken).ConfigureAwait(false);
-        StatusMessage = res.IsSuccess
+        PanelProfile? profileSnapshot = null;
+        await RunOnUiAsync(() => profileSnapshot = _activeProfile, cancellationToken).ConfigureAwait(false);
+
+        if (profileSnapshot is null) return;
+        var res = await _remoteClient.SaveRemoteProfileAsync(profileSnapshot, cancellationToken).ConfigureAwait(false);
+        var msg = res.IsSuccess
             ? $"Perfil '{res.Value.Name}' publicado para dispositivos conectados."
             : $"Sincronização remota indisponível: {res.Error!.Message}";
+
+        await RunOnUiAsync(() => StatusMessage = msg, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task AddApprovedAppAsync(CancellationToken cancellationToken)
     {
+        string rawId = string.Empty;
+        string rawName = string.Empty;
+        string rawPath = string.Empty;
+        bool requireConfirm = true;
+
+        await RunOnUiAsync(() =>
+        {
+            rawId = NewShortcutId;
+            rawName = NewShortcutName;
+            rawPath = NewShortcutPath;
+            requireConfirm = NewShortcutRequireConfirmation;
+        }, cancellationToken).ConfigureAwait(false);
+
         var cur = await _engine.GetSettingsAsync(cancellationToken).ConfigureAwait(false);
         if (cur.IsFailure) return;
 
-        var id = string.IsNullOrWhiteSpace(NewShortcutId)
+        var id = string.IsNullOrWhiteSpace(rawId)
             ? $"app-{cur.Value.ApprovedApps.Count + 1}"
-            : NewShortcutId.Trim();
-        var name = string.IsNullOrWhiteSpace(NewShortcutName) ? id : NewShortcutName.Trim();
-        var path = NewShortcutPath.Trim();
+            : rawId.Trim();
+        var name = string.IsNullOrWhiteSpace(rawName) ? id : rawName.Trim();
+        var path = rawPath.Trim();
 
         var entry = new ApprovedAppShortcut
         {
             ShortcutId = id,
             DisplayName = name,
             ExecutablePath = path,
-            RequireConfirmation = NewShortcutRequireConfirmation
+            RequireConfirmation = requireConfirm
         };
 
         var updatedList = cur.Value.ApprovedApps
@@ -420,15 +517,20 @@ public sealed class AutomationViewModel : ObservableObject, IDisposable
         var saved = await _engine.SaveSettingsAsync(cur.Value with { ApprovedApps = updatedList }, cancellationToken).ConfigureAwait(false);
         if (saved.IsFailure)
         {
-            StatusMessage = saved.Error!.Message;
+            var errMsg = saved.Error!.Message;
+            await RunOnUiAsync(() => StatusMessage = errMsg, cancellationToken).ConfigureAwait(false);
             return;
         }
 
-        NewShortcutId = string.Empty;
-        NewShortcutName = string.Empty;
-        NewShortcutPath = string.Empty;
-        ApplySettings(saved.Value);
-        StatusMessage = $"Atalho aprovado '{entry.DisplayName}' adicionado à allowlist.";
+        var settings = saved.Value;
+        await RunOnUiAsync(() =>
+        {
+            NewShortcutId = string.Empty;
+            NewShortcutName = string.Empty;
+            NewShortcutPath = string.Empty;
+            ApplySettings(settings);
+            StatusMessage = $"Atalho aprovado '{entry.DisplayName}' adicionado à allowlist.";
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task RemoveApprovedAppAsync(ApprovedAppShortcut? shortcut, CancellationToken cancellationToken)
@@ -445,69 +547,80 @@ public sealed class AutomationViewModel : ObservableObject, IDisposable
         var saved = await _engine.SaveSettingsAsync(updated, cancellationToken).ConfigureAwait(false);
         if (saved.IsSuccess)
         {
-            ApplySettings(saved.Value);
-            StatusMessage = $"Atalho '{shortcut.DisplayName}' removido da allowlist.";
+            var settings = saved.Value;
+            await RunOnUiAsync(() =>
+            {
+                ApplySettings(settings);
+                StatusMessage = $"Atalho '{shortcut.DisplayName}' removido da allowlist.";
+            }, cancellationToken).ConfigureAwait(false);
         }
     }
 
     private async Task SaveRuleAsync(CancellationToken cancellationToken)
     {
-        var name = string.IsNullOrWhiteSpace(RuleName)
-            ? $"Regra {SelectedTrigger} -> {SelectedActionType}"
-            : RuleName.Trim();
-
-        var conditions = new List<AutomationCondition>();
-        if (RequireConnectedCondition)
+        AutomationRule rule = new();
+        await RunOnUiAsync(() =>
         {
-            conditions.Add(new AutomationCondition { Operator = AutomationConditionOperator.RequireConnected, ExpectedValue = "true" });
-        }
+            var name = string.IsNullOrWhiteSpace(RuleName)
+                ? $"Regra {SelectedTrigger} -> {SelectedActionType}"
+                : RuleName.Trim();
 
-        var isSensitive = SelectedActionType == AutomationActionType.LaunchApprovedApp
-                          || (SelectedActionType == AutomationActionType.ExecuteControlCommand
-                              && RemoteControlCommandRequest.IsHighImpactAction(SelectedControlAction));
+            var conditions = new List<AutomationCondition>();
+            if (RequireConnectedCondition)
+            {
+                conditions.Add(new AutomationCondition { Operator = AutomationConditionOperator.RequireConnected, ExpectedValue = "true" });
+            }
 
-        var rule = new AutomationRule
-        {
-            RuleId = _editingRuleId ?? Guid.NewGuid(),
-            Name = name,
-            Description = RuleDescription?.Trim() ?? string.Empty,
-            IsEnabled = IsRuleEnabled,
-            Trigger = SelectedTrigger,
-            BatteryThresholdPercent = SelectedTrigger == AutomationTriggerType.BatteryLevelThreshold ? BatteryThresholdPercent : null,
-            ExpectedRouteFilter = string.IsNullOrWhiteSpace(SelectedRouteFilter) ? null : SelectedRouteFilter.Trim(),
-            Conditions = conditions,
-            Actions =
-            [
-                new AutomationAction
-                {
-                    ActionId = Guid.NewGuid(),
-                    ActionType = SelectedActionType,
-                    Label = SelectedActionType.ToString(),
-                    TargetProfileId = SelectedActionType == AutomationActionType.ActivatePanelProfile ? SelectedTargetProfile?.ProfileId : null,
-                    Title = string.IsNullOrWhiteSpace(ActionTitle) ? null : ActionTitle.Trim(),
-                    Message = string.IsNullOrWhiteSpace(ActionMessage) ? null : ActionMessage.Trim(),
-                    MediaAction = SelectedActionType == AutomationActionType.ExecuteMediaCommand ? SelectedMediaAction : null,
-                    ControlAction = SelectedActionType == AutomationActionType.ExecuteControlCommand ? SelectedControlAction : null,
-                    ShortcutId = SelectedActionType == AutomationActionType.LaunchApprovedApp ? SelectedShortcut?.ShortcutId : null,
-                    IsSensitiveAction = isSensitive
-                }
-            ],
-            CooldownSeconds = CooldownSeconds,
-            MaxExecutionsPerMinute = MaxExecutionsPerMinute,
-            RequireSensitiveAuthorization = true,
-            IsSensitiveAuthorized = AllowSensitiveExecution
-        };
+            var isSensitive = SelectedActionType == AutomationActionType.LaunchApprovedApp
+                              || (SelectedActionType == AutomationActionType.ExecuteControlCommand
+                                  && RemoteControlCommandRequest.IsHighImpactAction(SelectedControlAction));
+
+            rule = new AutomationRule
+            {
+                RuleId = _editingRuleId ?? Guid.NewGuid(),
+                Name = name,
+                Description = RuleDescription?.Trim() ?? string.Empty,
+                IsEnabled = IsRuleEnabled,
+                Trigger = SelectedTrigger,
+                BatteryThresholdPercent = SelectedTrigger == AutomationTriggerType.BatteryLevelThreshold ? BatteryThresholdPercent : null,
+                ExpectedRouteFilter = string.IsNullOrWhiteSpace(SelectedRouteFilter) ? null : SelectedRouteFilter.Trim(),
+                Conditions = conditions,
+                Actions =
+                [
+                    new AutomationAction
+                    {
+                        ActionId = Guid.NewGuid(),
+                        ActionType = SelectedActionType,
+                        Label = SelectedActionType.ToString(),
+                        TargetProfileId = SelectedActionType == AutomationActionType.ActivatePanelProfile ? SelectedTargetProfile?.ProfileId : null,
+                        Title = string.IsNullOrWhiteSpace(ActionTitle) ? null : ActionTitle.Trim(),
+                        Message = string.IsNullOrWhiteSpace(ActionMessage) ? null : ActionMessage.Trim(),
+                        MediaAction = SelectedActionType == AutomationActionType.ExecuteMediaCommand ? SelectedMediaAction : null,
+                        ControlAction = SelectedActionType == AutomationActionType.ExecuteControlCommand ? SelectedControlAction : null,
+                        ShortcutId = SelectedActionType == AutomationActionType.LaunchApprovedApp ? SelectedShortcut?.ShortcutId : null,
+                        IsSensitiveAction = isSensitive
+                    }
+                ],
+                CooldownSeconds = CooldownSeconds,
+                MaxExecutionsPerMinute = MaxExecutionsPerMinute,
+                RequireSensitiveAuthorization = true,
+                IsSensitiveAuthorized = AllowSensitiveExecution
+            };
+        }, cancellationToken).ConfigureAwait(false);
 
         var res = await _engine.SaveRuleAsync(rule, cancellationToken).ConfigureAwait(false);
         if (res.IsFailure)
         {
-            StatusMessage = res.Error!.Message;
+            var errMsg = res.Error!.Message;
+            await RunOnUiAsync(() => StatusMessage = errMsg, cancellationToken).ConfigureAwait(false);
             return;
         }
 
-        ResetRuleEditor();
+        await RunOnUiAsync(ResetRuleEditor, cancellationToken).ConfigureAwait(false);
         await ReloadRulesAndHistoryAsync(cancellationToken).ConfigureAwait(false);
-        StatusMessage = $"Regra '{res.Value.Name}' salva.";
+        await RunOnUiAsync(
+            () => StatusMessage = $"Regra '{res.Value.Name}' salva.",
+            cancellationToken).ConfigureAwait(false);
     }
 
     private async Task DuplicateRuleAsync(AutomationRule? rule, CancellationToken cancellationToken)
@@ -524,7 +637,9 @@ public sealed class AutomationViewModel : ObservableObject, IDisposable
         if (saved.IsSuccess)
         {
             await ReloadRulesAndHistoryAsync(cancellationToken).ConfigureAwait(false);
-            StatusMessage = $"Regra '{saved.Value.Name}' criada.";
+            await RunOnUiAsync(
+                () => StatusMessage = $"Regra '{saved.Value.Name}' criada.",
+                cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -535,7 +650,8 @@ public sealed class AutomationViewModel : ObservableObject, IDisposable
         if (toggled.IsSuccess)
         {
             await ReloadRulesAndHistoryAsync(cancellationToken).ConfigureAwait(false);
-            StatusMessage = $"Regra '{toggled.Value.Name}' {(toggled.Value.IsEnabled ? "ativada" : "desativada imediatamente")}.";
+            var msg = $"Regra '{toggled.Value.Name}' {(toggled.Value.IsEnabled ? "ativada" : "desativada imediatamente")}.";
+            await RunOnUiAsync(() => StatusMessage = msg, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -546,7 +662,9 @@ public sealed class AutomationViewModel : ObservableObject, IDisposable
         if (res.IsSuccess)
         {
             await ReloadRulesAndHistoryAsync(cancellationToken).ConfigureAwait(false);
-            StatusMessage = $"Regra '{rule.Name}' excluída.";
+            await RunOnUiAsync(
+                () => StatusMessage = $"Regra '{rule.Name}' excluída.",
+                cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -556,28 +674,39 @@ public sealed class AutomationViewModel : ObservableObject, IDisposable
         var res = await _engine.TriggerRuleManuallyAsync(rule.RuleId, NexusPermission.All, approvedSensitiveExecution: false, cancellationToken).ConfigureAwait(false);
         if (res.IsFailure)
         {
-            StatusMessage = res.Error!.Message;
+            var errMsg = res.Error!.Message;
+            await RunOnUiAsync(() => StatusMessage = errMsg, cancellationToken).ConfigureAwait(false);
             return;
         }
 
         await ReloadRulesAndHistoryAsync(cancellationToken).ConfigureAwait(false);
-        if (res.Value.Outcome == AutomationExecutionOutcome.BlockedAuthorization)
+        var rec = res.Value;
+        await RunOnUiAsync(() =>
         {
-            PendingSensitiveRule = rule;
-            PendingSensitivePrompt = $"Regra '{rule.Name}' possui ação sensível. Confirmar execução imediata?";
-        }
+            if (rec.Outcome == AutomationExecutionOutcome.BlockedAuthorization)
+            {
+                PendingSensitiveRule = rule;
+                PendingSensitivePrompt = $"Regra '{rule.Name}' possui ação sensível. Confirmar execução imediata?";
+            }
 
-        StatusMessage = $"{res.Value.RuleName}: {res.Value.Outcome} — {res.Value.Detail}";
+            StatusMessage = $"{rec.RuleName}: {rec.Outcome} — {rec.Detail}";
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task ConfirmSensitiveRuleAsync(CancellationToken cancellationToken)
     {
-        if (PendingSensitiveRule is null) return;
-        var rule = PendingSensitiveRule;
-        PendingSensitiveRule = null;
+        AutomationRule? rule = null;
+        await RunOnUiAsync(() =>
+        {
+            rule = PendingSensitiveRule;
+            PendingSensitiveRule = null;
+        }, cancellationToken).ConfigureAwait(false);
+
+        if (rule is null) return;
         var res = await _engine.TriggerRuleManuallyAsync(rule.RuleId, NexusPermission.All, approvedSensitiveExecution: true, cancellationToken).ConfigureAwait(false);
         await ReloadRulesAndHistoryAsync(cancellationToken).ConfigureAwait(false);
-        StatusMessage = res.IsSuccess ? $"{res.Value.Outcome}: {res.Value.Detail}" : res.Error!.Message;
+        var msg = res.IsSuccess ? $"{res.Value.Outcome}: {res.Value.Detail}" : res.Error!.Message;
+        await RunOnUiAsync(() => StatusMessage = msg, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task ClearHistoryAsync(CancellationToken cancellationToken)
@@ -585,52 +714,64 @@ public sealed class AutomationViewModel : ObservableObject, IDisposable
         var cleared = await _engine.ClearExecutionHistoryAsync(cancellationToken).ConfigureAwait(false);
         if (cleared.IsSuccess)
         {
-            ExecutionHistory.Clear();
-            StatusMessage = $"{cleared.Value} registros removidos.";
+            var count = cleared.Value;
+            await RunOnUiAsync(() =>
+            {
+                ExecutionHistory.Clear();
+                StatusMessage = $"{count} registros removidos.";
+            }, cancellationToken).ConfigureAwait(false);
         }
     }
 
     private async Task ReloadPanelProfilesAsync(CancellationToken cancellationToken)
     {
+        var generation = Interlocked.Increment(ref _profileReloadGeneration);
         var list = await _panelService.GetProfilesAsync(cancellationToken).ConfigureAwait(false);
-        if (list.IsSuccess)
-        {
-            Profiles.Clear();
-            foreach (var p in list.Value)
-            {
-                Profiles.Add(p);
-            }
-        }
-
         var active = await _panelService.GetActiveProfileAsync(cancellationToken).ConfigureAwait(false);
-        if (active.IsSuccess)
+
+        await RunOnUiAsync(() =>
         {
-            ApplyActiveProfile(active.Value);
-            SelectedTargetProfile ??= Profiles.FirstOrDefault(p => p.ProfileId == active.Value.ProfileId) ?? Profiles.FirstOrDefault();
-        }
+            if (generation != Volatile.Read(ref _profileReloadGeneration))
+            {
+                return;
+            }
+
+            if (list.IsSuccess)
+            {
+                ReplaceCollection(Profiles, list.Value);
+            }
+
+            if (active.IsSuccess)
+            {
+                ApplyActiveProfile(active.Value);
+                SelectedTargetProfile ??= Profiles.FirstOrDefault(p => p.ProfileId == active.Value.ProfileId) ?? Profiles.FirstOrDefault();
+            }
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task ReloadRulesAndHistoryAsync(CancellationToken cancellationToken)
     {
+        var generation = Interlocked.Increment(ref _rulesReloadGeneration);
         var rules = await _engine.GetRulesAsync(cancellationToken).ConfigureAwait(false);
-        if (rules.IsSuccess)
-        {
-            Rules.Clear();
-            foreach (var r in rules.Value)
-            {
-                Rules.Add(r);
-            }
-        }
-
         var hist = await _engine.GetExecutionHistoryAsync(80, cancellationToken).ConfigureAwait(false);
-        if (hist.IsSuccess)
+
+        await RunOnUiAsync(() =>
         {
-            ExecutionHistory.Clear();
-            foreach (var item in hist.Value)
+            if (generation != Volatile.Read(ref _rulesReloadGeneration))
             {
-                ExecutionHistory.Add(item);
+                return;
             }
-        }
+
+            if (rules.IsSuccess)
+            {
+                ReplaceCollection(Rules, rules.Value);
+            }
+
+            if (hist.IsSuccess)
+            {
+                ReplaceCollection(ExecutionHistory, hist.Value);
+            }
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     private void ApplyActiveProfile(PanelProfile profile)
@@ -641,11 +782,7 @@ public sealed class AutomationViewModel : ObservableObject, IDisposable
         SelectedGridColumns = profile.GridColumns;
         OnPropertyChanged(nameof(ActiveProfileName));
 
-        ActiveWidgets.Clear();
-        foreach (var w in profile.Widgets.OrderBy(x => x.SortOrder))
-        {
-            ActiveWidgets.Add(w);
-        }
+        ReplaceCollection(ActiveWidgets, profile.Widgets.OrderBy(x => x.SortOrder).ToArray());
     }
 
     private void ApplySettings(AutomationEngineSettings settings)
@@ -654,12 +791,7 @@ public sealed class AutomationViewModel : ObservableObject, IDisposable
         IsGlobalAutomationsEnabled = settings.GlobalAutomationsEnabled;
         AndroidLimitationsNote = settings.AndroidBackgroundLimitationNote;
 
-        ApprovedApps.Clear();
-        foreach (var app in settings.ApprovedApps)
-        {
-            ApprovedApps.Add(app);
-        }
-
+        ReplaceCollection(ApprovedApps, settings.ApprovedApps);
         SelectedShortcut ??= ApprovedApps.FirstOrDefault();
     }
 
@@ -708,48 +840,31 @@ public sealed class AutomationViewModel : ObservableObject, IDisposable
         => RunOnUi(() => ApplyActiveProfile(profile));
 
     private void OnExecutionLogged(object? sender, AutomationExecutionRecord record)
-    {
-        RunOnUi(() =>
-        {
-            ExecutionHistory.Insert(0, record);
-            while (ExecutionHistory.Count > 80)
-            {
-                ExecutionHistory.RemoveAt(ExecutionHistory.Count - 1);
-            }
-        });
-    }
+        => RunOnUi(() => PrependCapped(ExecutionHistory, record, 80));
 
     private void OnIndicatorEmitted(object? sender, PanelRuntimeIndicator indicator)
-    {
-        RunOnUi(() =>
-        {
-            ActiveIndicators.Insert(0, indicator);
-            while (ActiveIndicators.Count > 15)
-            {
-                ActiveIndicators.RemoveAt(ActiveIndicators.Count - 1);
-            }
-        });
-    }
+        => RunOnUi(() => PrependCapped(ActiveIndicators, indicator, 15));
 
     private void OnSettingsChanged(object? sender, AutomationEngineSettings settings)
         => RunOnUi(() => ApplySettings(settings));
 
     private void OnRemoteProfileUpdated(object? sender, PanelProfile profile)
-        => _ = _panelService.SaveProfileAsync(profile, CancellationToken.None);
+        => _ = SaveRemoteProfileSafelyAsync(profile);
+
+    private async Task SaveRemoteProfileSafelyAsync(PanelProfile profile)
+    {
+        try
+        {
+            await _panelService.SaveProfileAsync(profile, CancellationToken.None).ConfigureAwait(false);
+        }
+        catch
+        {
+            // Mantém resiliência em atualizações assíncronas recebidas em segundo plano.
+        }
+    }
 
     private void OnRemoteExecutionReceived(object? sender, AutomationExecutionRecord record)
         => OnExecutionLogged(sender, record);
-
-    private void RunOnUi(Action action)
-    {
-        if (_uiContext is null || ReferenceEquals(SynchronizationContext.Current, _uiContext))
-        {
-            action();
-            return;
-        }
-
-        _uiContext.Post(_ => action(), null);
-    }
 
     public void Dispose()
     {
